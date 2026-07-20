@@ -790,3 +790,13 @@ int trap_PC_ReadToken( int handle, pc_token_t *pc_token ) {
 int trap_PC_SourceFileAndLine( int handle, char *filename, int *line ) {
 	return syscall( BOTLIB_PC_SOURCE_FILE_AND_LINE, handle, filename, line );
 }
+
+// extension interface
+
+qboolean trap_GetValue( char *value, int valueSize, const char *key ) {
+	return syscall( dll_com_trapGetValue, value, valueSize, key );
+}
+
+void trap_VR_RegisterState( void *state, int stateSize, int apiMajor, int apiMinor ) {
+	syscall( dll_trap_VR_RegisterState, state, stateSize, apiMajor, apiMinor );
+}

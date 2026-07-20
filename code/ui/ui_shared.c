@@ -54,6 +54,31 @@ static qboolean g_editingField = qfalse;
 static itemDef_t *g_bindItem = NULL;
 static itemDef_t *g_editItem = NULL;
 
+// The field taking typed text, or NULL.
+itemDef_t *Menu_EditingItem( void ) {
+	return g_editingField ? g_editItem : NULL;
+}
+
+// Starts editing item with the cursor after its text, where End leaves it, or ends the edit when NULL.
+void Menu_SetEditingItem( itemDef_t *item ) {
+	if ( item ) {
+		editFieldDef_t	*editPtr = (editFieldDef_t *)item->typeData;
+		char			buff[1024];
+		int				len = 0;
+
+		if ( item->cvar ) {
+			DC->getCVarString( item->cvar, buff, sizeof( buff ) );
+			len = strlen( buff );
+		}
+		item->cursorPos = len;
+		if ( editPtr ) {
+			editPtr->paintOffset = editPtr->maxPaintChars > 0 && len > editPtr->maxPaintChars ? len - editPtr->maxPaintChars : 0;
+		}
+	}
+	g_editingField = item != NULL;
+	g_editItem = item;
+}
+
 menuDef_t Menus[MAX_MENUS];      // defined menus
 int menuCount = 0;               // how many
 

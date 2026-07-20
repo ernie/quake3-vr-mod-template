@@ -352,7 +352,7 @@ static void UI_DrawBannerString2( int x, int y, const char* str, vec4_t color )
 	trap_R_SetColor( color );
 	
 	ax = x * uis.xscale + uis.bias;
-	ay = y * uis.yscale;
+	ay = y * uis.yscale + uis.biasY;
 
 	s = str;
 	while ( *s )
@@ -462,7 +462,7 @@ static void UI_DrawProportionalString2( int x, int y, const char* str, vec4_t co
 	trap_R_SetColor( color );
 	
 	ax = x * uis.xscale + uis.bias;
-	ay = y * uis.yscale;
+	ay = y * uis.yscale + uis.biasY;
 
 	s = str;
 	while ( *s )
@@ -657,7 +657,7 @@ static void UI_DrawString2( int x, int y, const char* str, vec4_t color, int cha
 	trap_R_SetColor( color );
 	
 	ax = x * uis.xscale + uis.bias;
-	ay = y * uis.yscale;
+	ay = y * uis.yscale + uis.biasY;
 	aw = charw * uis.xscale;
 	ah = charh * uis.yscale;
 
@@ -1105,7 +1105,7 @@ Adjusted for resolution and screen aspect ratio
 void UI_AdjustFrom640( float *x, float *y, float *w, float *h ) {
 	// expect valid pointers
 	*x = *x * uis.xscale + uis.bias;
-	*y *= uis.yscale;
+	*y = *y * uis.yscale + uis.biasY;
 	*w *= uis.xscale;
 	*h *= uis.yscale;
 }
@@ -1240,7 +1240,7 @@ void UI_Refresh( int realtime )
 	if (uis.debug)
 	{
 		// cursor coordinates
-		UI_DrawString( 0, 0, va("(%d,%d)",uis.cursorx,uis.cursory), UI_LEFT|UI_SMALLFONT, colorRed );
+		UI_DrawString( 0, 0, va("(%d,%d)",(int)uis.cursorx,(int)uis.cursory), UI_LEFT|UI_SMALLFONT, colorRed );
 	}
 #endif
 
