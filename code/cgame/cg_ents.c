@@ -1082,6 +1082,10 @@ void CG_AddPacketEntities( void ) {
 	// generate and add the entity from the playerstate
 	ps = &cg.predictedPlayerState;
 	BG_PlayerStateToEntityState( ps, &cg.predictedPlayerEntity.currentState, qfalse );
+
+	// Set VR head orientation for local player (mirrors) - see vr_cgame.c
+	CG_VR_PredictedPlayerHead();
+
 	CG_AddCEntity( &cg.predictedPlayerEntity );
 
 	// lerp the non-predicted value for lightning gun origins

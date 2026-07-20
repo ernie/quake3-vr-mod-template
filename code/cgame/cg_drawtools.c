@@ -47,8 +47,8 @@ void CG_AdjustFrom640( float *x, float *y, float *w, float *h ) {
 	}
 #endif
 	// scale for screen sizes
-	*x *= cgs.screenXScale;
-	*y *= cgs.screenYScale;
+	*x = *x * cgs.screenXScale + cgs.screenXBias;
+	*y = *y * cgs.screenYScale + cgs.screenYBias;
 	*w *= cgs.screenXScale;
 	*h *= cgs.screenYScale;
 }
@@ -613,7 +613,7 @@ static void UI_DrawBannerString2( int x, int y, const char* str, vec4_t color )
 	trap_R_SetColor( color );
 	
 	ax = x * cgs.screenXScale + cgs.screenXBias;
-	ay = y * cgs.screenYScale;
+	ay = y * cgs.screenYScale + cgs.screenYBias;
 
 	s = str;
 	while ( *s )
@@ -723,7 +723,7 @@ static void UI_DrawProportionalString2( int x, int y, const char* str, vec4_t co
 	trap_R_SetColor( color );
 	
 	ax = x * cgs.screenXScale + cgs.screenXBias;
-	ay = y * cgs.screenYScale;
+	ay = y * cgs.screenYScale + cgs.screenYBias;
 
 	s = str;
 	while ( *s )
