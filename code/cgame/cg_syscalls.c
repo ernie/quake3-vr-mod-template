@@ -446,3 +446,29 @@ qboolean trap_GetEntityToken( char *buffer, int bufferSize ) {
 qboolean trap_R_inPVS( const vec3_t p1, const vec3_t p2 ) {
 	return syscall( CG_R_INPVS, p1, p2 );
 }
+
+// extension interface
+
+qboolean trap_GetValue( char *value, int valueSize, const char *key ) {
+	return syscall( dll_com_trapGetValue, value, valueSize, key );
+}
+
+void trap_VR_RegisterState( void *state, int stateSize, int apiMajor, int apiMinor ) {
+	syscall( dll_trap_VR_RegisterState, state, stateSize, apiMajor, apiMinor );
+}
+
+void trap_R_SceneComplete( void ) {
+	syscall( dll_trap_R_SceneComplete );
+}
+
+void trap_R_HUDBufferStart( qboolean clear ) {
+	syscall( dll_trap_R_HUDBufferStart, clear );
+}
+
+void trap_R_HUDBufferEnd( void ) {
+	syscall( dll_trap_R_HUDBufferEnd );
+}
+
+void trap_HapticEvent( const char *event, int position, int channel, int intensity, float yaw, float height ) {
+	syscall( dll_trap_HapticEvent, event, position, channel, intensity, PASSFLOAT(yaw), PASSFLOAT(height) );
+}

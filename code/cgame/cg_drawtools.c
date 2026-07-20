@@ -23,6 +23,15 @@ Foundation, Inc., 51 Franklin St, Fifth Floor, Boston, MA  02110-1301  USA
 // cg_drawtools.c -- helper functions called by cg_draw, cg_scoreboard, cg_info, etc
 #include "cg_local.h"
 
+// Stock carries no widescreen anchor substrate, so there is nothing to save
+// or restore around the VR HUD-buffer pass; empty bodies are the documented
+// plain-4:3 host form (Appendix E of the integration guide).
+void CG_PushHUDAnchors( void ) {
+}
+
+void CG_PopHUDAnchors( void ) {
+}
+
 /*
 ================
 CG_AdjustFrom640

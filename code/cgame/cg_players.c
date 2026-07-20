@@ -1624,7 +1624,7 @@ static void CG_DustTrail( centity_t *cent ) {
 CG_TrailItem
 ===============
 */
-static void CG_TrailItem( centity_t *cent, qhandle_t hModel ) {
+void CG_TrailItem( centity_t *cent, qhandle_t hModel, vec3_t offset, float scale ) {
 	refEntity_t		ent;
 	vec3_t			angles;
 	vec3_t			axis[3];
@@ -1864,7 +1864,9 @@ static void CG_PlayerPowerups( centity_t *cent, refEntity_t *torso ) {
 			CG_PlayerFlag( cent, cgs.media.redFlagFlapSkin, torso );
 		}
 		else {
-			CG_TrailItem( cent, cgs.media.redFlagModel );
+			vec3_t offset;
+			VectorSet(offset, 0, -1, 0);
+			CG_TrailItem( cent, cgs.media.redFlagModel, offset, 0.1f );
 		}
 		trap_R_AddLightToScene( cent->lerpOrigin, 200 + (rand()&31), 1.0, 0.2f, 0.2f );
 	}
@@ -1875,7 +1877,9 @@ static void CG_PlayerPowerups( centity_t *cent, refEntity_t *torso ) {
 			CG_PlayerFlag( cent, cgs.media.blueFlagFlapSkin, torso );
 		}
 		else {
-			CG_TrailItem( cent, cgs.media.blueFlagModel );
+			vec3_t offset;
+			VectorSet(offset, 0, -1, 0);
+			CG_TrailItem( cent, cgs.media.blueFlagModel, offset, 0.1f );
 		}
 		trap_R_AddLightToScene( cent->lerpOrigin, 200 + (rand()&31), 0.2f, 0.2f, 1.0 );
 	}
@@ -1886,7 +1890,9 @@ static void CG_PlayerPowerups( centity_t *cent, refEntity_t *torso ) {
 			CG_PlayerFlag( cent, cgs.media.neutralFlagFlapSkin, torso );
 		}
 		else {
-			CG_TrailItem( cent, cgs.media.neutralFlagModel );
+			vec3_t offset;
+			VectorSet(offset, 0, -1, 0);
+			CG_TrailItem( cent, cgs.media.neutralFlagModel, offset, 0.1f );
 		}
 		trap_R_AddLightToScene( cent->lerpOrigin, 200 + (rand()&31), 1.0, 1.0, 1.0 );
 	}

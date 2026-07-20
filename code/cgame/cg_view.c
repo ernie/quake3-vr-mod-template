@@ -313,7 +313,7 @@ CG_OffsetFirstPersonView
 
 ===============
 */
-static void CG_OffsetFirstPersonView( void ) {
+void CG_OffsetFirstPersonView( void ) {
 	float			*origin;
 	float			*angles;
 	float			bob;
