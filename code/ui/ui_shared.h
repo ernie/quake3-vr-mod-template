@@ -384,6 +384,11 @@ typedef struct {
   qhandle_t cursor;
 	float FPS;
 
+	// VR menu-move haptic: fired on item focus change; each module wires its
+	// own handler (UI_VR_OnMenuMove in the ui link, CG_VR_OnMenuMove in the
+	// cgame link).
+	void (*vrMenuMove)( void );
+
 } displayContextDef_t;
 
 const char *String_Alloc(const char *p);
@@ -448,5 +453,7 @@ int			trap_PC_LoadSource( const char *filename );
 int			trap_PC_FreeSource( int handle );
 int			trap_PC_ReadToken( int handle, pc_token_t *pc_token );
 int			trap_PC_SourceFileAndLine( int handle, char *filename, int *line );
+
+#include "vr_uishared.h"
 
 #endif

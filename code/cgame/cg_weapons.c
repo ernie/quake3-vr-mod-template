@@ -25,6 +25,38 @@ Foundation, Inc., 51 Franklin St, Fifth Floor, Boston, MA  02110-1301  USA
 
 /*
 ==========================
+CG_LaserSight
+==========================
+*/
+void CG_LaserSight( vec3_t start, vec3_t end, byte colour[4], float width ) {
+	refEntity_t     re;
+	memset( &re, 0, sizeof( re ) );
+
+	//Ensure shader is loaded
+	cgs.media.railCoreShader = trap_R_RegisterShader( "railCore" );
+
+	re.reType = RT_LASERSIGHT;
+	re.renderfx = RF_FIRST_PERSON;
+	re.customShader = cgs.media.railCoreShader;
+
+	VectorCopy( start, re.origin );
+	VectorCopy( end, re.oldorigin );
+
+	//radius is used to store width info
+	re.radius = width;
+
+	AxisClear( re.axis );
+
+	re.shaderRGBA[0] = colour[0];
+	re.shaderRGBA[1] = colour[1];
+	re.shaderRGBA[2] = colour[2];
+	re.shaderRGBA[3] = colour[3];
+
+	trap_R_AddRefEntityToScene(&re);
+}
+
+/*
+==========================
 CG_MachineGunEjectBrass
 ==========================
 */
@@ -905,7 +937,7 @@ static int CG_MapTorsoToWeaponFrame( clientInfo_t *ci, int frame ) {
 CG_CalculateWeaponPosition
 ==============
 */
-static void CG_CalculateWeaponPosition( vec3_t origin, vec3_t angles ) {
+void CG_CalculateWeaponPosition( vec3_t origin, vec3_t angles ) {
 	float	scale;
 	int		delta;
 	float	fracsin;
@@ -1525,7 +1557,7 @@ void CG_DrawWeaponSelect( void ) {
 CG_WeaponSelectable
 ===============
 */
-static qboolean CG_WeaponSelectable( int i ) {
+qboolean CG_WeaponSelectable( int i ) {
 	if ( !cg.snap->ps.ammo[i] ) {
 		return qfalse;
 	}

@@ -1405,6 +1405,9 @@ qboolean Item_SetFocus(itemDef_t *item, float x, float y) {
 
 	if (playSound && sfx) {
 		DC->startLocalSound( *sfx, CHAN_LOCAL_SOUND );
+		if ( DC->vrMenuMove ) {
+			DC->vrMenuMove();
+		}
 	}
 
 	for (i = 0; i < parent->itemCount; i++) {

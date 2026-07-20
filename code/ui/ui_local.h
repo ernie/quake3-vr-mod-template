@@ -29,6 +29,37 @@ Foundation, Inc., 51 Franklin St, Fifth Floor, Boston, MA  02110-1301  USA
 #include "../client/keycodes.h"
 #include "../game/bg_public.h"
 #include "ui_shared.h"
+#include "../game/vr_shared.h"
+
+// VR API bootstrap (vr_ui.c) — extension interface discovered by name
+extern vr_shared_t	vr_state;
+extern vr_shared_t	*vr;
+extern qboolean		vrActive;
+
+#ifdef Q3_VM
+extern qboolean	(*trap_GetValue)( char *value, int valueSize, const char *key );
+extern void		(*trap_VR_RegisterState)( void *state, int stateSize, int apiMajor, int apiMinor );
+extern void		(*trap_HapticEvent)( const char *description, int position, int channel, int intensity, float yaw, float height );
+extern void		(*trap_VKeyboard_Show)( void );
+extern void		(*trap_VKeyboard_Hide)( void );
+extern qboolean	(*trap_VKeyboard_IsActive)( void );
+extern qboolean	(*trap_VKeyboard_HandleKey)( int key );
+#else
+qboolean	trap_GetValue( char *value, int valueSize, const char *key );
+void		trap_VR_RegisterState( void *state, int stateSize, int apiMajor, int apiMinor );
+void		trap_HapticEvent( const char *description, int position, int channel, int intensity, float yaw, float height );
+void		trap_VKeyboard_Show( void );
+void		trap_VKeyboard_Hide( void );
+qboolean	trap_VKeyboard_IsActive( void );
+qboolean	trap_VKeyboard_HandleKey( int key );
+extern int	dll_com_trapGetValue;
+extern int	dll_trap_VR_RegisterState;
+extern int	dll_trap_HapticEvent;
+extern int	dll_trap_VKeyboard_Show;
+extern int	dll_trap_VKeyboard_Hide;
+extern int	dll_trap_VKeyboard_IsActive;
+extern int	dll_trap_VKeyboard_HandleKey;
+#endif
 
 // global display context
 
@@ -1133,6 +1164,6 @@ typedef struct postGameInfo_s {
 	int baseScore;
 } postGameInfo_t;
 
-
+#include "vr_ui.h"
 
 #endif

@@ -25,6 +25,13 @@ Foundation, Inc., 51 Franklin St, Fifth Floor, Boston, MA  02110-1301  USA
 
 level_locals_t	level;
 
+// extension interface
+#ifdef Q3_VM
+qboolean (*trap_GetValue)( char *value, int valueSize, const char *key );
+#else
+int dll_com_trapGetValue;
+#endif
+
 typedef struct {
 	vmCvar_t	*vmCvar;
 	char		*cvarName;

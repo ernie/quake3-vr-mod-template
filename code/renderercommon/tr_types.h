@@ -44,6 +44,8 @@ Foundation, Inc., 51 Franklin St, Fifth Floor, Boston, MA  02110-1301  USA
 						// projection matrix won't be hacked to reduce the stereo separation as
 						// is done for the gun.
 
+#define RF_OVERBRIGHT		0x0020		// apply overbright scaling to diffuse lighting
+
 #define	RF_NOSHADOW		0x0040		// don't add stencil shadows
 
 #define RF_LIGHTING_ORIGIN	0x0080		// use refEntity->lightingOrigin instead of refEntity->origin
@@ -54,6 +56,10 @@ Foundation, Inc., 51 Franklin St, Fifth Floor, Boston, MA  02110-1301  USA
 #define	RF_SHADOW_PLANE		0x0100		// use refEntity->shadowPlane
 #define	RF_WRAP_FRAMES		0x0200		// mod the model frames by the maxframes to allow continuous
 										// animation without needing to know the frame count
+
+#define RF_WORLD_ORIENTED	0x0400		// sprite uses entity axis instead of billboarding toward camera
+#define RF_VIEW_ORIENTED	0x1000		// sprite billboards on the full view axes (rolls with the
+										// HMD); without it sprites billboard horizon-locked
 
 // refdef flags
 #define RDF_NOWORLDMODEL	0x0001		// used for player configuration screen
@@ -80,6 +86,7 @@ typedef enum {
 	RT_RAIL_RINGS,
 	RT_LIGHTNING,
 	RT_PORTALSURFACE,		// doesn't draw anything, just info for portals
+	RT_LASERSIGHT,
 
 	RT_MAX_REF_ENTITY_TYPE
 } refEntityType_t;
@@ -117,6 +124,10 @@ typedef struct {
 	// extra sprite information
 	float		radius;
 	float		rotation;
+
+	// VR-engine extension; must remain last so the stock ioq3 prefix
+	// stays layout-compatible with engines that do not know this field
+	qboolean	invert;
 } refEntity_t;
 
 
@@ -139,6 +150,10 @@ typedef struct {
 
 	// text messages for deform text shaders
 	char		text[MAX_RENDER_STRINGS][MAX_RENDER_STRING_LENGTH];
+
+	// VR-engine extension; must remain last so the stock ioq3 prefix
+	// stays layout-compatible with engines that do not know this field
+	qboolean	isHUD;
 } refdef_t;
 
 

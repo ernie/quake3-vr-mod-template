@@ -34,6 +34,15 @@ int forceModelModificationCount = -1;
 void CG_Init( int serverMessageNum, int serverCommandSequence, int clientNum );
 void CG_Shutdown( void );
 
+// extension interface
+#ifdef Q3_VM
+qboolean (*trap_GetValue)( char *value, int valueSize, const char *key );
+void (*trap_VR_RegisterState)( void *state, int stateSize, int apiMajor, int apiMinor );
+#else
+int dll_com_trapGetValue;
+int dll_trap_VR_RegisterState;
+#endif
+
 
 /*
 ================

@@ -164,6 +164,8 @@ void UI_DrawConnectScreen( qboolean overlay ) {
 	uiClientState_t	cstate;
 	char			info[MAX_INFO_VALUE];
 
+	UI_VideoCheck( trap_Milliseconds() );
+
 	Menu_Cache();
 
 	if ( !overlay ) {

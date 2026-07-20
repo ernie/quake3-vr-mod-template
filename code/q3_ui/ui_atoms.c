@@ -351,15 +351,15 @@ static void UI_DrawBannerString2( int x, int y, const char* str, vec4_t color )
 	// draw the colored text
 	trap_R_SetColor( color );
 	
-	ax = x * uis.xscale + uis.bias;
-	ay = y * uis.yscale;
+	ax = x * uis.scale + uis.biasX;
+	ay = y * uis.scale + uis.biasY;
 
 	s = str;
 	while ( *s )
 	{
 		ch = *s & 127;
 		if ( ch == ' ' ) {
-			ax += ((float)PROPB_SPACE_WIDTH + (float)PROPB_GAP_WIDTH)* uis.xscale;
+			ax += ((float)PROPB_SPACE_WIDTH + (float)PROPB_GAP_WIDTH)* uis.scale;
 		}
 		else if ( ch >= 'A' && ch <= 'Z' ) {
 			ch -= 'A';
@@ -367,10 +367,10 @@ static void UI_DrawBannerString2( int x, int y, const char* str, vec4_t color )
 			frow = (float)propMapB[ch][1] / 256.0f;
 			fwidth = (float)propMapB[ch][2] / 256.0f;
 			fheight = (float)PROPB_HEIGHT / 256.0f;
-			aw = (float)propMapB[ch][2] * uis.xscale;
-			ah = (float)PROPB_HEIGHT * uis.yscale;
+			aw = (float)propMapB[ch][2] * uis.scale;
+			ah = (float)PROPB_HEIGHT * uis.scale;
 			trap_R_DrawStretchPic( ax, ay, aw, ah, fcol, frow, fcol+fwidth, frow+fheight, uis.charsetPropB );
-			ax += (aw + (float)PROPB_GAP_WIDTH * uis.xscale);
+			ax += (aw + (float)PROPB_GAP_WIDTH * uis.scale);
 		}
 		s++;
 	}
@@ -461,27 +461,27 @@ static void UI_DrawProportionalString2( int x, int y, const char* str, vec4_t co
 	// draw the colored text
 	trap_R_SetColor( color );
 	
-	ax = x * uis.xscale + uis.bias;
-	ay = y * uis.yscale;
+	ax = x * uis.scale + uis.biasX;
+	ay = y * uis.scale + uis.biasY;
 
 	s = str;
 	while ( *s )
 	{
 		ch = *s & 127;
 		if ( ch == ' ' ) {
-			aw = (float)PROP_SPACE_WIDTH * uis.xscale * sizeScale;
+			aw = (float)PROP_SPACE_WIDTH * uis.scale * sizeScale;
 		}
 		else if ( propMap[ch][2] != -1 ) {
 			fcol = (float)propMap[ch][0] / 256.0f;
 			frow = (float)propMap[ch][1] / 256.0f;
 			fwidth = (float)propMap[ch][2] / 256.0f;
 			fheight = (float)PROP_HEIGHT / 256.0f;
-			aw = (float)propMap[ch][2] * uis.xscale * sizeScale;
-			ah = (float)PROP_HEIGHT * uis.yscale * sizeScale;
+			aw = (float)propMap[ch][2] * uis.scale * sizeScale;
+			ah = (float)PROP_HEIGHT * uis.scale * sizeScale;
 			trap_R_DrawStretchPic( ax, ay, aw, ah, fcol, frow, fcol+fwidth, frow+fheight, charset );
 		}
 
-		ax += (aw + (float)PROP_GAP_WIDTH * uis.xscale * sizeScale);
+		ax += (aw + (float)PROP_GAP_WIDTH * uis.scale * sizeScale);
 		s++;
 	}
 
@@ -656,10 +656,10 @@ static void UI_DrawString2( int x, int y, const char* str, vec4_t color, int cha
 	// draw the colored text
 	trap_R_SetColor( color );
 	
-	ax = x * uis.xscale + uis.bias;
-	ay = y * uis.yscale;
-	aw = charw * uis.xscale;
-	ah = charh * uis.yscale;
+	ax = x * uis.scale + uis.biasX;
+	ay = y * uis.scale + uis.biasY;
+	aw = charw * uis.scale;
+	ah = charh * uis.scale;
 
 	s = str;
 	while ( *s )
@@ -851,6 +851,7 @@ UI_KeyEvent
 void UI_KeyEvent( int key, int down ) {
 	sfxHandle_t		s;
 
+	UI_VideoCheck( trap_Milliseconds() );
 	if (!uis.activemenu) {
 		return;
 	}
@@ -876,27 +877,25 @@ UI_MouseEvent
 void UI_MouseEvent( int dx, int dy )
 {
 	int				i;
-	int				bias;
 	menucommon_s*	m;
 
-	if (!uis.activemenu)
+	if ( !uis.activemenu )
 		return;
 
-	// convert X bias to 640 coords
-	bias = uis.bias / uis.xscale;
+	// update virtual mouse cursor coordinates
+	uis.cursorx += dx * uis.cursorScaleR;
+	uis.cursory += dy * uis.cursorScaleR;
 
-	// update mouse screen position
-	uis.cursorx += dx;
-	if (uis.cursorx < -bias)
-		uis.cursorx = -bias;
-	else if (uis.cursorx > SCREEN_WIDTH+bias)
-		uis.cursorx = SCREEN_WIDTH+bias;
+	// clamp virtual coordinates
+	if ( uis.cursorx < uis.screenXmin )
+		uis.cursorx = uis.screenXmin;
+	else if ( uis.cursorx > uis.screenXmax )
+		uis.cursorx = uis.screenXmax;
 
-	uis.cursory += dy;
-	if (uis.cursory < 0)
-		uis.cursory = 0;
-	else if (uis.cursory > SCREEN_HEIGHT)
-		uis.cursory = SCREEN_HEIGHT;
+	if ( uis.cursory < uis.screenYmin )
+		uis.cursory = uis.screenYmin;
+	else if ( uis.cursory > uis.screenYmax )
+		uis.cursory = uis.screenYmax;
 
 	// region test the active menu items
 	for (i=0; i<uis.activemenu->nitems; i++)
@@ -1073,20 +1072,7 @@ void UI_Init( void ) {
 	UI_InitGameinfo();
 
 	// cache redundant calulations
-	trap_GetGlconfig( &uis.glconfig );
-
-	// for 640x480 virtualized screen
-	uis.xscale = uis.glconfig.vidWidth * (1.0/640.0);
-	uis.yscale = uis.glconfig.vidHeight * (1.0/480.0);
-	if ( uis.glconfig.vidWidth * 480 > uis.glconfig.vidHeight * 640 ) {
-		// wide screen
-		uis.bias = 0.5 * ( uis.glconfig.vidWidth - ( uis.glconfig.vidHeight * (640.0/480.0) ) );
-		uis.xscale = uis.yscale;
-	}
-	else {
-		// no wide screen
-		uis.bias = 0;
-	}
+	UI_VideoCheck( -99999 );
 
 	// initialize the menu system
 	Menu_Cache();
@@ -1099,15 +1085,17 @@ void UI_Init( void ) {
 ================
 UI_AdjustFrom640
 
-Adjusted for resolution and screen aspect ratio
+Adjusted for resolution and screen aspect ratio. Uniform scale plus X/Y
+bias, computed by UI_VideoCheck - keeping widgets and cursor in the same
+transform as the direct-scale text draw paths.
 ================
 */
 void UI_AdjustFrom640( float *x, float *y, float *w, float *h ) {
 	// expect valid pointers
-	*x = *x * uis.xscale + uis.bias;
-	*y *= uis.yscale;
-	*w *= uis.xscale;
-	*h *= uis.yscale;
+	*x = *x * uis.scale + uis.biasX;
+	*y = *y * uis.scale + uis.biasY;
+	*w *= uis.scale;
+	*h *= uis.scale;
 }
 
 void UI_DrawNamedPic( float x, float y, float width, float height, const char *picname ) {
@@ -1208,6 +1196,8 @@ void UI_Refresh( int realtime )
 
 	UI_UpdateCvars();
 
+	UI_VideoCheck( realtime );
+
 	if ( uis.activemenu )
 	{
 		if (uis.activemenu->fullscreen)
@@ -1240,7 +1230,7 @@ void UI_Refresh( int realtime )
 	if (uis.debug)
 	{
 		// cursor coordinates
-		UI_DrawString( 0, 0, va("(%d,%d)",uis.cursorx,uis.cursory), UI_LEFT|UI_SMALLFONT, colorRed );
+		UI_DrawString( 0, 0, va("(%d,%d)",(int)uis.cursorx,(int)uis.cursory), UI_LEFT|UI_SMALLFONT, colorRed );
 	}
 #endif
 

@@ -25,6 +25,43 @@ Foundation, Inc., 51 Franklin St, Fifth Floor, Boston, MA  02110-1301  USA
 
 /*
 ================
+CG_GetViewable4x3Dimensions
+
+Calculate the maximum 4:3 area that fits within the framebuffer.
+For ultra-wide headsets (e.g., Pimax 8KX with ~2:1 ratio), we may be height-limited
+rather than width-limited.
+================
+*/
+void CG_GetViewable4x3Dimensions(float *outWidth, float *outHeight)
+{
+	float fbWidth = cgs.glconfig.vidWidth;
+	float fbHeight = cgs.glconfig.vidHeight;
+
+	float heightFromWidth = fbWidth * 0.75f;  // 4:3 height if we use full width
+	float widthFromHeight = fbHeight * (4.0f / 3.0f); // 4:3 width if we use full height
+
+	if (heightFromWidth <= fbHeight) {
+		// Normal case: width-limited, full width fits with 4:3 height
+		*outWidth = fbWidth;
+		*outHeight = heightFromWidth;
+	} else {
+		// Ultra-wide case: height-limited, constrain width to fit 4:3
+		*outHeight = fbHeight;
+		*outWidth = widthFromHeight;
+	}
+}
+
+// Stock carries no widescreen anchor substrate, so there is nothing to save
+// or restore around the VR HUD-buffer pass; empty bodies are the documented
+// plain-4:3 host form (Appendix E of the integration guide).
+void CG_PushHUDAnchors( void ) {
+}
+
+void CG_PopHUDAnchors( void ) {
+}
+
+/*
+================
 CG_AdjustFrom640
 
 Adjusted for resolution and screen aspect ratio

@@ -157,6 +157,54 @@ vmCvar_t	ui_server16;
 vmCvar_t	ui_cdkeychecked;
 vmCvar_t	ui_ioq3;
 
+/*
+=================
+UI_VideoCheck
+
+Recompute the uniform scale, bias, cursor bounds and cursor speed when the
+video size changes. Throttled to once a second.
+=================
+*/
+void UI_VideoCheck( int time )
+{
+	if ( abs( time - uis.lastVideoCheck ) > 1000 ) {
+
+		int oldWidth, oldHeight;
+		oldWidth = uis.glconfig.vidWidth;
+		oldHeight = uis.glconfig.vidHeight;
+
+		trap_GetGlconfig( &uis.glconfig );
+
+		if ( uis.glconfig.vidWidth != oldWidth || uis.glconfig.vidHeight != oldHeight ) {
+			uis.biasY = 0.0;
+			uis.biasX = 0.0;
+			// for 640x480 virtualized screen
+			if ( uis.glconfig.vidWidth * 480 > uis.glconfig.vidHeight * 640 ) {
+				// wide screen, scale by height
+				uis.scale = uis.glconfig.vidHeight * (1.0/480.0);
+				uis.biasX = 0.5 * ( uis.glconfig.vidWidth - ( uis.glconfig.vidHeight * (640.0/480.0) ) );
+			} else {
+				// no wide screen, scale by width
+				uis.scale = uis.glconfig.vidWidth * (1.0/640.0);
+				uis.biasY = 0.5 * ( uis.glconfig.vidHeight - ( uis.glconfig.vidWidth * (480.0/640) ) );
+			}
+
+			uis.screenXmin = 0.0 - (uis.biasX / uis.scale);
+			uis.screenXmax = 640.0 + (uis.biasX / uis.scale);
+
+			uis.screenYmin = 0.0 - (uis.biasY / uis.scale);
+			uis.screenYmax = 480.0 + (uis.biasY / uis.scale);
+
+			uis.cursorScaleR = 1.0 / uis.scale;
+			if ( uis.cursorScaleR < 0.5 ) {
+				uis.cursorScaleR = 0.5;
+			}
+		}
+
+		uis.lastVideoCheck = time;
+	}
+}
+
 static cvarTable_t		cvarTable[] = {
 	{ &ui_ffa_fraglimit, "ui_ffa_fraglimit", "20", CVAR_ARCHIVE },
 	{ &ui_ffa_timelimit, "ui_ffa_timelimit", "0", CVAR_ARCHIVE },

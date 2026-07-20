@@ -402,3 +402,33 @@ qboolean trap_VerifyCDKey( const char *key, const char *chksum) {
 void trap_SetPbClStatus( int status ) {
 	syscall( UI_SET_PBCLSTATUS, status );
 }
+
+// extension interface (discovered by name via trap_GetValue; storage in vr_ui.c)
+
+qboolean trap_GetValue( char *value, int valueSize, const char *key ) {
+	return syscall( dll_com_trapGetValue, value, valueSize, key );
+}
+
+void trap_VR_RegisterState( void *state, int stateSize, int apiMajor, int apiMinor ) {
+	syscall( dll_trap_VR_RegisterState, state, stateSize, apiMajor, apiMinor );
+}
+
+void trap_HapticEvent( const char *description, int position, int channel, int intensity, float yaw, float height ) {
+	syscall( dll_trap_HapticEvent, description, position, channel, intensity, PASSFLOAT(yaw), PASSFLOAT(height) );
+}
+
+void trap_VKeyboard_Show( void ) {
+	syscall( dll_trap_VKeyboard_Show );
+}
+
+void trap_VKeyboard_Hide( void ) {
+	syscall( dll_trap_VKeyboard_Hide );
+}
+
+qboolean trap_VKeyboard_IsActive( void ) {
+	return syscall( dll_trap_VKeyboard_IsActive );
+}
+
+qboolean trap_VKeyboard_HandleKey( int key ) {
+	return syscall( dll_trap_VKeyboard_HandleKey, key );
+}

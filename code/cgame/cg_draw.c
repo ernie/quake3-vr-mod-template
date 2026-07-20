@@ -1923,7 +1923,7 @@ static void CG_DrawCrosshair(void)
 CG_DrawCrosshair3D
 =================
 */
-static void CG_DrawCrosshair3D(void)
+void CG_DrawCrosshair3D(void)
 {
 	float		w;
 	qhandle_t	hShader;
@@ -2519,7 +2519,7 @@ void CG_DrawTimedMenus( void ) {
 CG_Draw2D
 =================
 */
-static void CG_Draw2D(stereoFrame_t stereoFrame)
+void CG_Draw2D(stereoFrame_t stereoFrame)
 {
 #ifdef MISSIONPACK
 	if (cgs.orderPending && cg.time > cgs.orderTime) {
@@ -2617,6 +2617,88 @@ static void CG_Draw2D(stereoFrame_t stereoFrame)
 	if ( !cg.scoreBoardShowing) {
 		CG_DrawCenterString();
 	}
+}
+
+/*
+==============
+CG_GetProjectionCenter
+
+The projection's optical center in virtual 640x480 coordinates. This host
+renders symmetric FOVs, so the center is the geometric center; a host with
+asymmetric per-eye FOVs computes the offset from its projection matrix
+(take trinity's implementation).
+==============
+*/
+void CG_GetProjectionCenter( float *outX, float *outY )
+{
+	if (outX) *outX = 320.0f;
+	if (outY) *outY = 240.0f;
+}
+
+/*
+=================
+CG_Draw2DMinimal - Draws minimal 2D HUD elements for weapon zoomed state
+There are some checks here that are  overkill for current use case, given
+the current usage for specifically vr->weapon_zoomed, but keeping the checks
+more or less identical to non-minimal HUD, just in case.
+=================
+*/
+void CG_Draw2DMinimal( stereoFrame_t stereoView )
+{
+	if ( cg.snap->ps.pm_type == PM_INTERMISSION ) {
+		return;
+	}
+
+	// Skip if spectator - no minimal HUD needed
+	if ( cg.snap->ps.persistant[PERS_TEAM] == TEAM_SPECTATOR ) {
+		CG_DrawCrosshairNames();
+		return;
+	}
+
+	// don't draw any status if dead or the scoreboard is being explicitly shown
+	if ( !cg.showScores && cg.snap->ps.stats[STAT_HEALTH] > 0 ) {
+		CG_DrawAmmoWarning();
+		CG_DrawCrosshairNames();
+		CG_DrawReward();
+	}
+
+	CG_DrawLagometer();
+
+#ifdef MISSIONPACK
+	if (!cg_paused.integer) {
+		CG_DrawUpperRight(stereoView);
+	}
+#else
+	CG_DrawUpperRight(stereoView);
+#endif
+
+#ifndef MISSIONPACK
+	CG_DrawLowerRight();
+	CG_DrawLowerLeft();
+#endif
+
+	if ( !CG_DrawFollow() ) {
+		CG_DrawWarmup();
+	}
+
+	// don't draw center string if scoreboard is up
+	if ( !cg.scoreBoardShowing ) {
+		CG_DrawCenterString();
+	}
+}
+
+/*
+=================
+CG_DrawScreen2D - Draws 2D elements always intended for the screen
+
+Host-owned screen-space overlay pass (damage border and friends), drawn
+directly to the active render target by the VR frame fork. This host draws
+nothing here - the documented no-frills form; take trinity's implementation
+for damage vignettes and the zoom reticle.
+=================
+*/
+void CG_DrawScreen2D(void)
+{
 }
 
 

@@ -725,6 +725,7 @@ void UI_DrawPlayer( float x, float y, float w, float h, playerInfo_t *pi, int ti
 	vec3_t			maxs = {16, 16, 32};
 	float			len;
 	float			xx;
+	float			fovX, fovY;
 
 	if ( !pi->legsModel || !pi->torsoModel || !pi->headModel || !pi->animations[0].numFrames ) {
 		return;
@@ -741,6 +742,12 @@ void UI_DrawPlayer( float x, float y, float w, float h, playerInfo_t *pi, int ti
 			trap_S_StartLocalSound( weaponChangeSound, CHAN_LOCAL );
 		}
 	}
+
+	// calculate fov from virtual dimensions so it is resolution-independent
+	fovX = (int)(w / 640.0f * 90.0f);
+	xx = w / tan( fovX / 360 * M_PI );
+	fovY = atan2( h, xx );
+	fovY *= ( 360 / (float)M_PI );
 
 	UI_AdjustFrom640( &x, &y, &w, &h );
 
@@ -760,10 +767,8 @@ void UI_DrawPlayer( float x, float y, float w, float h, playerInfo_t *pi, int ti
 	refdef.width = w;
 	refdef.height = h;
 
-	refdef.fov_x = (int)((float)refdef.width / uis.xscale / 640.0f * 90.0f);
-	xx = refdef.width / uis.xscale / tan( refdef.fov_x / 360 * M_PI );
-	refdef.fov_y = atan2( refdef.height / uis.yscale, xx );
-	refdef.fov_y *= ( 360 / M_PI );
+	refdef.fov_x = fovX;
+	refdef.fov_y = fovY;
 
 	// calculate distance so the player nearly fills the box
 	len = 0.7 * ( maxs[2] - mins[2] );		
