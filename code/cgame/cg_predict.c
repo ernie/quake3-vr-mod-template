@@ -247,9 +247,11 @@ static void CG_InterpolatePlayerState( qboolean grabAngles ) {
 			out->viewangles[i] = LerpAngle( 
 				prev->ps.viewangles[i], next->ps.viewangles[i], f );
 		}
-		out->velocity[i] = prev->ps.velocity[i] + 
+		out->velocity[i] = prev->ps.velocity[i] +
 			f * (next->ps.velocity[i] - prev->ps.velocity[i] );
 	}
+
+	CG_VR_InterpolateHeadStats( out, &prev->ps, &next->ps, f );
 
 }
 

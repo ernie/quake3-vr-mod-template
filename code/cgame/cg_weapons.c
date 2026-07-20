@@ -943,7 +943,13 @@ void CG_CalculateWeaponPosition( vec3_t origin, vec3_t angles ) {
 	float	fracsin;
 
 	VectorCopy( cg.refdef.vieworg, origin );
-	VectorCopy( cg.refdefViewAngles, angles );
+
+	// VR follow: weapon points along weapon aim, not head direction
+	if ( CG_VR_IsVRFollow() ) {
+		VectorCopy( cg.predictedPlayerState.viewangles, angles );
+	} else {
+		VectorCopy( cg.refdefViewAngles, angles );
+	}
 
 	// on odd legs, invert some angles
 	if ( cg.bobcycle & 1 ) {
@@ -1009,43 +1015,54 @@ static void CG_LightningBolt( centity_t *cent, vec3_t origin ) {
 
 	memset( &beam, 0, sizeof( beam ) );
 
-	// CPMA  "true" lightning
-	if ((cent->currentState.number == cg.predictedPlayerState.clientNum) && (cg_trueLightning.value != 0)) {
-		vec3_t angle;
-		int i;
+	// VR: bolt originates at the controller-held weapon; pulse the firing haptic
+	if ( vrActive && !cg.renderingThirdPerson
+			&& (cent->currentState.number == cg.predictedPlayerState.clientNum) ) {
+		vec3_t vrAngle;
 
-		for (i = 0; i < 3; i++) {
-			float a = cent->lerpAngles[i] - cg.refdefViewAngles[i];
-			if (a > 180) {
-				a -= 360;
-			}
-			if (a < -180) {
-				a += 360;
+		CG_CalculateVRWeaponPosition( muzzlePoint, vrAngle );
+		AngleVectors( vrAngle, forward, NULL, NULL );
+
+		CG_VR_OnWeaponFiring( cent->currentState.weapon );
+	} else {
+		// CPMA  "true" lightning
+		if ((cent->currentState.number == cg.predictedPlayerState.clientNum) && (cg_trueLightning.value != 0)) {
+			vec3_t angle;
+			int i;
+
+			for (i = 0; i < 3; i++) {
+				float a = cent->lerpAngles[i] - cg.refdefViewAngles[i];
+				if (a > 180) {
+					a -= 360;
+				}
+				if (a < -180) {
+					a += 360;
+				}
+
+				angle[i] = cg.refdefViewAngles[i] + a * (1.0 - cg_trueLightning.value);
+				if (angle[i] < 0) {
+					angle[i] += 360;
+				}
+				if (angle[i] > 360) {
+					angle[i] -= 360;
+				}
 			}
 
-			angle[i] = cg.refdefViewAngles[i] + a * (1.0 - cg_trueLightning.value);
-			if (angle[i] < 0) {
-				angle[i] += 360;
-			}
-			if (angle[i] > 360) {
-				angle[i] -= 360;
-			}
+			AngleVectors(angle, forward, NULL, NULL );
+			VectorCopy(cent->lerpOrigin, muzzlePoint );
+//			VectorCopy(cg.refdef.vieworg, muzzlePoint );
+		} else {
+			// !CPMA
+			AngleVectors( cent->lerpAngles, forward, NULL, NULL );
+			VectorCopy(cent->lerpOrigin, muzzlePoint );
 		}
 
-		AngleVectors(angle, forward, NULL, NULL );
-		VectorCopy(cent->lerpOrigin, muzzlePoint );
-//		VectorCopy(cg.refdef.vieworg, muzzlePoint );
-	} else {
-		// !CPMA
-		AngleVectors( cent->lerpAngles, forward, NULL, NULL );
-		VectorCopy(cent->lerpOrigin, muzzlePoint );
-	}
-
-	anim = cent->currentState.legsAnim & ~ANIM_TOGGLEBIT;
-	if ( anim == LEGS_WALKCR || anim == LEGS_IDLECR ) {
-		muzzlePoint[2] += CROUCH_VIEWHEIGHT;
-	} else {
-		muzzlePoint[2] += DEFAULT_VIEWHEIGHT;
+		anim = cent->currentState.legsAnim & ~ANIM_TOGGLEBIT;
+		if ( anim == LEGS_WALKCR || anim == LEGS_IDLECR ) {
+			muzzlePoint[2] += CROUCH_VIEWHEIGHT;
+		} else {
+			muzzlePoint[2] += DEFAULT_VIEWHEIGHT;
+		}
 	}
 
 	VectorMA( muzzlePoint, 14, forward, muzzlePoint );
@@ -1392,6 +1409,8 @@ void CG_AddViewWeapon( playerState_t *ps ) {
 	float		fovOffset;
 	vec3_t		angles;
 	weaponInfo_t	*weapon;
+	qboolean	vrPosed;
+	float		vrScale;
 
 	if ( ps->persistant[PERS_TEAM] == TEAM_SPECTATOR ) {
 		return;
@@ -1426,6 +1445,14 @@ void CG_AddViewWeapon( playerState_t *ps ) {
 		return;
 	}
 
+	if ( CG_VR_WeaponWheel() ) {
+		return;		// selector drew instead of the gun
+	}
+
+	if ( CG_VR_HideViewWeapon() ) {
+		return;
+	}
+
 	// drop gun lower at higher fov
 	if ( cg_fov.integer > 90 ) {
 		fovOffset = -0.2 * ( cg_fov.integer - 90 );
@@ -1440,11 +1467,24 @@ void CG_AddViewWeapon( playerState_t *ps ) {
 	memset (&hand, 0, sizeof(hand));
 
 	// set up gun position
-	CG_CalculateWeaponPosition( hand.origin, angles );
+	vrScale = 1.0f;
+	vrPosed = CG_VR_WeaponHandPose( hand.origin, angles, &vrScale );
+	if ( !vrPosed ) {
+		CG_CalculateWeaponPosition( hand.origin, angles );
 
-	VectorMA( hand.origin, cg_gun_x.value, cg.refdef.viewaxis[0], hand.origin );
-	VectorMA( hand.origin, cg_gun_y.value, cg.refdef.viewaxis[1], hand.origin );
-	VectorMA( hand.origin, (cg_gun_z.value+fovOffset), cg.refdef.viewaxis[2], hand.origin );
+		// VR follow: offset weapon along weapon-aim axes, not head-view axes
+		if ( CG_VR_IsVRFollow() ) {
+			vec3_t	weaponAxis[3];
+			AnglesToAxis( cg.predictedPlayerState.viewangles, weaponAxis );
+			VectorMA( hand.origin, cg_gun_x.value, weaponAxis[0], hand.origin );
+			VectorMA( hand.origin, cg_gun_y.value, weaponAxis[1], hand.origin );
+			VectorMA( hand.origin, (cg_gun_z.value+fovOffset), weaponAxis[2], hand.origin );
+		} else {
+			VectorMA( hand.origin, cg_gun_x.value, cg.refdef.viewaxis[0], hand.origin );
+			VectorMA( hand.origin, cg_gun_y.value, cg.refdef.viewaxis[1], hand.origin );
+			VectorMA( hand.origin, (cg_gun_z.value+fovOffset), cg.refdef.viewaxis[2], hand.origin );
+		}
+	}
 
 	AnglesToAxis( angles, hand.axis );
 
@@ -1462,7 +1502,11 @@ void CG_AddViewWeapon( playerState_t *ps ) {
 	}
 
 	hand.hModel = weapon->handsModel;
-	hand.renderfx = RF_DEPTHHACK | RF_FIRST_PERSON | RF_MINLIGHT;
+	if ( vrPosed ) {
+		CG_VR_WeaponHandFinish( &hand, vrScale );
+	} else {
+		hand.renderfx = RF_DEPTHHACK | RF_FIRST_PERSON | RF_MINLIGHT;
+	}
 
 	// add everything onto the hand
 	CG_AddPlayerWeapon( &hand, ps, &cg.predictedPlayerEntity, ps->persistant[PERS_TEAM] );
@@ -1760,6 +1804,12 @@ void CG_FireWeapon( centity_t *cent ) {
 	if ( weap->ejectBrassFunc && cg_brassTime.integer > 0 ) {
 		weap->ejectBrassFunc( cent );
 	}
+
+	//Are we the player?
+	if (cent->currentState.number == cg.predictedPlayerState.clientNum)
+	{
+		CG_VR_OnWeaponFired( ent->weapon );
+	}
 }
 
 
@@ -1976,6 +2026,8 @@ CG_MissileHitPlayer
 */
 void CG_MissileHitPlayer( int weapon, vec3_t origin, vec3_t dir, int entityNum ) {
 	CG_Bleed( origin, entityNum );
+
+	CG_VR_OnHitByMissile( entityNum );
 
 	// some weapons will make an explosion with the blood, while
 	// others will just make the blood

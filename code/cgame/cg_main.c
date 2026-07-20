@@ -1033,6 +1033,9 @@ static void CG_RegisterGraphics( void ) {
 		}
 	}
 
+	// register all weapons (as they are used on weapon wheel selector)
+	CG_VR_RegisterMedia();
+
 	// wall marks
 	cgs.media.bulletMarkShader = trap_R_RegisterShader( "gfx/damage/bullet_mrk" );
 	cgs.media.burnMarkShader = trap_R_RegisterShader( "gfx/damage/burn_med_mrk" );
@@ -1808,7 +1811,7 @@ void CG_LoadHudMenu( void ) {
 	cgDC.stopCinematic = &CG_StopCinematic;
 	cgDC.drawCinematic = &CG_DrawCinematic;
 	cgDC.runCinematicFrame = &CG_RunCinematicFrame;
-	
+
 	Init_Display(&cgDC);
 
 	Menu_Reset();
@@ -1865,10 +1868,14 @@ void CG_Init( int serverMessageNum, int serverCommandSequence, int clientNum ) {
 	memset( cg_weapons, 0, sizeof(cg_weapons) );
 	memset( cg_items, 0, sizeof(cg_items) );
 
+	CG_VR_DeathCamReset();
+
 	cg.clientNum = clientNum;
 
 	cgs.processedSnapshotNum = serverMessageNum;
 	cgs.serverCommandSequence = serverCommandSequence;
+
+	CG_VR_Init();
 
 	// load a few needed things before we do any screen updates
 	cgs.media.charsetShader		= trap_R_RegisterShader( "gfx/2d/bigchars" );
@@ -1891,6 +1898,9 @@ void CG_Init( int serverMessageNum, int serverCommandSequence, int clientNum ) {
 	trap_GetGlconfig( &cgs.glconfig );
 	cgs.screenXScale = cgs.glconfig.vidWidth / 640.0;
 	cgs.screenYScale = cgs.glconfig.vidHeight / 480.0;
+	if ( CG_VR_HostScale( &cgs.screenXScale, &cgs.screenXBias, &cgs.screenYBias ) ) {
+		cgs.screenYScale = cgs.screenXScale;
+	}
 
 	// get the gamestate from the client system
 	trap_GetGameState( &cgs.gameState );
@@ -1969,6 +1979,7 @@ Called before every level change or subsystem restart
 void CG_Shutdown( void ) {
 	// some mods may need to do cleanup work here,
 	// like closing files or archiving session data
+	CG_VR_Shutdown();
 }
 
 
