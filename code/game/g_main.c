@@ -419,6 +419,8 @@ void G_InitGame( int levelTime, int randomSeed, int restart ) {
 	G_Printf ("gamename: %s\n", GAMEVERSION);
 	G_Printf ("gamedate: %s\n", PRODUCT_DATE);
 
+	G_VR_Init();
+
 	srand( randomSeed );
 
 	G_RegisterCvars();
