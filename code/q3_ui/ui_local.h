@@ -32,8 +32,55 @@ Foundation, Inc., 51 Franklin St, Fifth Floor, Boston, MA  02110-1301  USA
 #define UI_API_VERSION	4
 #include "../client/keycodes.h"
 #include "../game/bg_public.h"
+#include "../game/vr_shared.h"
 
 typedef void (*voidfunc_f)(void);
+
+// VR API bootstrap (vr_ui.c) — extension interface discovered by name
+extern vr_shared_t	vr_state;
+extern vr_shared_t	*vr;
+extern qboolean		vrActive;
+
+#ifdef Q3_VM
+extern qboolean	(*trap_GetValue)( char *value, int valueSize, const char *key );
+extern void		(*trap_VR_RegisterState)( void *state, int stateSize, int apiMajor, int apiMinor );
+extern void		(*trap_HapticEvent)( const char *description, int position, int channel, int intensity, float yaw, float height );
+extern void		(*trap_VKeyboard_Show)( void );
+extern void		(*trap_VKeyboard_Hide)( void );
+extern qboolean	(*trap_VKeyboard_IsActive)( void );
+extern qboolean	(*trap_VKeyboard_HandleKey)( int key );
+extern void		(*trap_VR_BindCapture)( void );
+#else
+qboolean	trap_GetValue( char *value, int valueSize, const char *key );
+void		trap_VR_RegisterState( void *state, int stateSize, int apiMajor, int apiMinor );
+void		trap_HapticEvent( const char *description, int position, int channel, int intensity, float yaw, float height );
+void		trap_VKeyboard_Show( void );
+void		trap_VKeyboard_Hide( void );
+qboolean	trap_VKeyboard_IsActive( void );
+qboolean	trap_VKeyboard_HandleKey( int key );
+void		trap_VR_BindCapture( void );
+extern int	dll_com_trapGetValue;
+extern int	dll_trap_VR_RegisterState;
+extern int	dll_trap_HapticEvent;
+extern int	dll_trap_VKeyboard_Show;
+extern int	dll_trap_VKeyboard_Hide;
+extern int	dll_trap_VKeyboard_IsActive;
+extern int	dll_trap_VKeyboard_HandleKey;
+extern int	dll_trap_VR_BindCapture;
+#endif
+
+// Unified VR options menu (ui_vroptions.c + page files) — presence-gated on UI_VR_Platform
+void UI_VROptionsMenu( void );
+void UI_VRBindingsMenu( void );
+void UI_VROptions_Cache( void );
+void UI_VRComfortMenu( void );
+void UI_VRComfort_Cache( void );
+void UI_VRControlsMenu( void );
+void UI_VRControls_Cache( void );
+void UI_VRHudDisplayMenu( void );
+void UI_VRHudDisplay_Cache( void );
+void UI_VRMirrorMenu( void );
+void UI_VRMirror_Cache( void );
 
 extern vmCvar_t	ui_ffa_fraglimit;
 extern vmCvar_t	ui_ffa_timelimit;
@@ -537,8 +584,8 @@ qboolean UI_RegisterClientModelname( playerInfo_t *pi, const char *modelSkinName
 typedef struct {
 	int					frametime;
 	int					realtime;
-	int					cursorx;
-	int					cursory;
+	float				cursorx;
+	float				cursory;
 	int					menusp;
 	menuframework_s*	activemenu;
 	menuframework_s*	stack[MAX_MENUDEPTH];
@@ -557,6 +604,7 @@ typedef struct {
 	float				xscale;
 	float				yscale;
 	float				bias;
+	float				biasY;		// 0 on a flatscreen engine; the VR transform moves menus vertically
 	qboolean			demoversion;
 	qboolean			firstdraw;
 } uiStatic_t;
@@ -804,5 +852,7 @@ void UI_SignupMenu( void );
 //
 void RankStatus_Cache( void );
 void UI_RankStatusMenu( void );
+
+#include "vr_ui.h"
 
 #endif

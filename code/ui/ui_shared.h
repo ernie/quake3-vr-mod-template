@@ -372,8 +372,8 @@ typedef struct {
   float			bias;
   int				realTime;
   int				frameTime;
-	int				cursorx;
-	int				cursory;
+	float			cursorx;
+	float			cursory;
 	qboolean	debug;
 
   cachedAssets_t Assets;
@@ -383,6 +383,10 @@ typedef struct {
   qhandle_t gradientImage;
   qhandle_t cursor;
 	float FPS;
+
+	// VR keyboard: called when an edit field starts editing; the ui link wires
+	// UI_VR_OnEditField, the cgame link leaves it NULL.
+	void (*vrEditField)( void );
 
 } displayContextDef_t;
 
@@ -448,5 +452,7 @@ int			trap_PC_LoadSource( const char *filename );
 int			trap_PC_FreeSource( int handle );
 int			trap_PC_ReadToken( int handle, pc_token_t *pc_token );
 int			trap_PC_SourceFileAndLine( int handle, char *filename, int *line );
+
+#include "vr_uishared.h"
 
 #endif

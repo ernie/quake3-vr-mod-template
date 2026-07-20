@@ -25,6 +25,7 @@ Foundation, Inc., 51 Franklin St, Fifth Floor, Boston, MA  02110-1301  USA
 #include "../qcommon/q_shared.h"
 #include "bg_public.h"
 #include "g_public.h"
+#include "vr_shared.h"
 
 //==================================================================
 
@@ -950,4 +951,22 @@ void	trap_BotResetWeaponState(int weaponstate);
 int		trap_GeneticParentsAndChildSelection(int numranks, float *ranks, int *parent1, int *parent2, int *child);
 
 void	trap_SnapVector( float *v );
+
+// extension interface
+
+#ifdef Q3_VM
+extern qboolean	(*trap_GetValue)( char *value, int valueSize, const char *key );
+#else
+qboolean trap_GetValue( char *value, int valueSize, const char *key );
+void trap_VR_RegisterState( void *state, int stateSize, int apiMajor, int apiMinor );
+extern int dll_com_trapGetValue;
+extern int dll_trap_VR_RegisterState;
+#endif
+
+// VR shared-state mirror (vr_game.c); zeroed/dormant on flatscreen engines
+extern vr_shared_t vr_state;
+extern vr_shared_t *vr;
+extern qboolean g_vrActive;
+
+#include "vr_game.h"
 
