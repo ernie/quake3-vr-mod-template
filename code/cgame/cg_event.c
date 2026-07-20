@@ -545,6 +545,8 @@ void CG_EntityEvent( centity_t *cent, vec3_t position ) {
 	}
 	ci = &cgs.clientinfo[ clientNum ];
 
+	CG_VR_EntityEvent( cent, event, clientNum );
+
 	switch ( event ) {
 	//
 	// movement generated events
@@ -986,10 +988,15 @@ void CG_EntityEvent( centity_t *cent, vec3_t position ) {
 		
 		if(es->clientNum == cg.snap->ps.clientNum && !cg.renderingThirdPerson)
 		{
-			if(cg_drawGun.integer == 2)
-				VectorMA(es->origin2, 8, cg.refdef.viewaxis[1], es->origin2);
-			else if(cg_drawGun.integer == 3)
-				VectorMA(es->origin2, 4, cg.refdef.viewaxis[1], es->origin2);
+			vec3_t	muzzleAngles;
+
+			if ( !CG_VR_WeaponMuzzleOrigin( es->origin2, muzzleAngles ) )
+			{
+				if(cg_drawGun.integer == 2)
+					VectorMA(es->origin2, 8, cg.refdef.viewaxis[1], es->origin2);
+				else if(cg_drawGun.integer == 3)
+					VectorMA(es->origin2, 4, cg.refdef.viewaxis[1], es->origin2);
+			}
 		}
 
 		CG_RailTrail(ci, es->origin2, es->pos.trBase);
