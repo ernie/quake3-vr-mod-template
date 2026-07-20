@@ -26,6 +26,7 @@ Foundation, Inc., 51 Franklin St, Fifth Floor, Boston, MA  02110-1301  USA
 #include "../qcommon/q_shared.h"
 #include "bg_public.h"
 #include "bg_local.h"
+#include "vr_bg.h"
 
 pmove_t		*pm;
 pml_t		pml;
@@ -197,7 +198,7 @@ static void PM_Friction( void ) {
 			// if getting knocked back, no friction
 			if ( ! (pm->ps->pm_flags & PMF_TIME_KNOCKBACK) ) {
 				control = speed < pm_stopspeed ? pm_stopspeed : speed;
-				drop += control*pm_friction*pml.frametime;
+				drop += control*BG_VR_PmoveFriction( pm->ps, pm_friction )*pml.frametime;
 			}
 		}
 	}
@@ -771,7 +772,7 @@ static void PM_WalkMove( void ) {
 	if ( ( pml.groundTrace.surfaceFlags & SURF_SLICK ) || pm->ps->pm_flags & PMF_TIME_KNOCKBACK ) {
 		accelerate = pm_airaccelerate;
 	} else {
-		accelerate = pm_accelerate;
+		accelerate = BG_VR_PmoveAccelerate( pm->ps, pm_accelerate );
 	}
 
 	PM_Accelerate (wishdir, wishspeed, accelerate);
@@ -1354,7 +1355,19 @@ static void PM_Footsteps( void ) {
 		}
 		return;
 	}
-	
+
+	// VR players: analog sticks and roomscale drift produce tiny velocities
+	// that must not advance the walk cycle
+	if ( BG_VR_DriftIdle( pm->ps ) && pm->xyspeed < 10 ) {
+		pm->ps->bobCycle = 0;	// start at beginning of cycle again
+		if ( pm->ps->pm_flags & PMF_DUCKED ) {
+			PM_ContinueLegsAnim( LEGS_IDLECR );
+		} else {
+			PM_ContinueLegsAnim( LEGS_IDLE );
+		}
+		return;
+	}
+
 
 	footstep = qfalse;
 
@@ -1801,8 +1814,12 @@ void PM_UpdateViewAngles( playerState_t *ps, const usercmd_t *cmd ) {
 		return;		// no view changes at all
 	}
 
-	if ( ps->pm_type != PM_SPECTATOR && ps->stats[STAT_HEALTH] <= 0 ) {
+	if ( BG_VR_DeadViewLocked( ps ) ) {
 		return;		// no view changes at all
+	}
+
+	if ( BG_VR_UpdateViewAngles( ps, cmd ) ) {
+		return;		// 6DOF client: YAW-only delta compensation applied
 	}
 
 	// circularly clamp the angles with deltas

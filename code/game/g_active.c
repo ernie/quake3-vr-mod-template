@@ -994,6 +994,8 @@ void ClientThink_real( gentity_t *ent ) {
 	client->buttons = ucmd->buttons;
 	client->latched_buttons |= client->buttons & ~client->oldbuttons;
 
+	G_VR_ClientThink( client, ucmd );
+
 	// check for respawning
 	if ( client->ps.stats[STAT_HEALTH] <= 0 ) {
 		// wait for the attack button to be pressed
@@ -1181,6 +1183,9 @@ void ClientEndFrame( gentity_t *ent ) {
 	else {
 		BG_PlayerStateToEntityState( &ent->client->ps, &ent->s, qtrue );
 	}
+
+	G_VR_ClientEndFrame( ent->client, ent );
+
 	SendPendingPredictableEvents( &ent->client->ps );
 
 	// set the bit for the reachability area the client is currently in
