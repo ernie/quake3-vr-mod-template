@@ -1,0 +1,7 @@
+tools/bin/
+build/vm-*/
+build/staging-*/
+dist/
+*.qvm
+*.jts
+*.map

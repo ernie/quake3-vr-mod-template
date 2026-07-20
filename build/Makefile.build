@@ -1,0 +1,79 @@
+CONFIG ?= baseq3
+DISTDIR ?= .
+include config-$(CONFIG).mk
+
+# The archiver is not needed until pack time, but that is too late to
+# discover it is missing - fail before any QVM compiles.
+ifeq ($(shell command -v $(firstword $(7Z)) 2>/dev/null),)
+$(error $(firstword $(7Z)) not found on PATH - install 7-Zip (p7zip-full on Debian/Ubuntu))
+endif
+
+BD = vm-$(CONFIG)
+STAGING = staging-$(CONFIG)
+
+srcs = $(foreach file,$1,$(if $(patsubst %.asm,,$(file)),$2/$(file).asm,$(file)))
+qa_asm = $(call srcs,$(QA_SRC),$(BD)/game)
+cg_asm = $(call srcs,$(CG_SRC),$(BD)/cgame)
+ui_asm = $(call srcs,$(UI_SRC),$(BD)/ui)
+
+all: dirs $(DISTDIR)/$(PK3)
+
+dirs:
+	mkdir -p $(BD)/game $(BD)/cgame $(BD)/ui
+
+.PHONY: all dirs
+
+# Asset edits at any depth must retrigger the pack, but make has no recursive
+# wildcard and prerequisite lists cannot hold spaced filenames - so probe
+# mtimes with find and force the pack when any asset is newer than the pk3.
+ifneq ($(shell find ../assets-$(CONFIG) -type f -newer $(DISTDIR)/$(PK3) -print -quit 2>/dev/null),)
+ASSETS_FORCE = FORCE
+endif
+
+FORCE:
+.PHONY: FORCE
+
+$(DISTDIR)/$(PK3): $(STAGING)/vm/qagame.qvm $(STAGING)/vm/cgame.qvm $(STAGING)/vm/ui.qvm $(ASSETS_FORCE)
+	rm -f $(DISTDIR)/$(PK3)
+	cd $(STAGING) && $(7Z) ../$(DISTDIR)/$(PK3) vm/*.qvm
+	if [ -n "$$(ls -A ../assets-$(CONFIG) 2>/dev/null)" ]; then cd ../assets-$(CONFIG) && $(7Z) ../build/$(DISTDIR)/$(PK3) *; fi
+
+$(STAGING)/vm/%.qvm: $(BD)/%.qvm | $(STAGING)/vm
+	cp $< $@
+
+$(STAGING)/vm:
+	mkdir -p $@
+
+cc = cd $(BD)/$1 && $(Q3LCC) $2 -o $(notdir $@).tmp ../../$< && mv $(notdir $@).tmp $(notdir $@)
+qa_cc = $(call cc,game,$(QA_CFLAGS))
+cg_cc = $(call cc,cgame,$(CG_CFLAGS))
+ui_cc = $(call cc,ui,$(UI_CFLAGS))
+
+$(BD)/qagame.qvm: $(qa_asm)
+	$(Q3ASM) -o $@ $(qa_asm)
+
+$(BD)/cgame.qvm: $(cg_asm)
+	$(Q3ASM) -o $@ $(cg_asm)
+
+$(BD)/ui.qvm: $(ui_asm)
+	$(Q3ASM) -o $@ $(ui_asm)
+
+# Header dependencies - conservatively depend on every header reachable from
+# each module's include paths, so a header edit always rebuilds the module.
+# A hand-picked list once omitted ABI headers upstream and let stale .asm
+# files ride through incremental builds; do not thin these out. The build
+# files themselves are prerequisites too, so a flag change forces recompiles.
+BUILD_FILES = Makefile.build config-$(CONFIG).mk srcs.mk
+GAME_HEADERS = $(wildcard $(QADIR)/*.h) $(wildcard $(CMDIR)/*.h) $(wildcard ../ui/*.h) $(BUILD_FILES)
+CGAME_HEADERS = $(wildcard $(CGDIR)/*.h) $(wildcard $(QADIR)/*.h) $(wildcard $(UIDIR)/*.h) $(wildcard $(CMDIR)/*.h) $(wildcard $(basedir)/ui/*.h) $(wildcard $(basedir)/renderercommon/*.h) $(wildcard $(basedir)/client/*.h) $(wildcard ../ui/*.h) $(BUILD_FILES)
+UI_HEADERS = $(wildcard $(UIDIR)/*.h) $(wildcard $(QADIR)/*.h) $(wildcard $(CMDIR)/*.h) $(wildcard $(basedir)/ui/*.h) $(wildcard $(basedir)/renderercommon/*.h) $(wildcard $(basedir)/client/*.h) $(wildcard ../ui/*.h) $(BUILD_FILES)
+
+$(BD)/game/%.asm: $(QADIR)/%.c $(GAME_HEADERS); $(qa_cc)
+$(BD)/game/%.asm: $(CMDIR)/%.c $(GAME_HEADERS); $(qa_cc)
+$(BD)/cgame/%.asm: $(QADIR)/%.c $(CGAME_HEADERS); $(cg_cc)
+$(BD)/cgame/%.asm: $(CGDIR)/%.c $(CGAME_HEADERS); $(cg_cc)
+$(BD)/cgame/%.asm: $(UIDIR)/%.c $(CGAME_HEADERS); $(cg_cc)
+$(BD)/cgame/%.asm: $(CMDIR)/%.c $(CGAME_HEADERS); $(cg_cc)
+$(BD)/ui/%.asm: $(QADIR)/%.c $(UI_HEADERS); $(ui_cc)
+$(BD)/ui/%.asm: $(UIDIR)/%.c $(UI_HEADERS); $(ui_cc)
+$(BD)/ui/%.asm: $(CMDIR)/%.c $(UI_HEADERS); $(ui_cc)
