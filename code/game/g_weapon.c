@@ -69,12 +69,17 @@ CheckGauntletAttack
 qboolean CheckGauntletAttack( gentity_t *ent ) {
 	trace_t		tr;
 	vec3_t		end;
+	vec3_t		viewang;
 	gentity_t	*tent;
 	gentity_t	*traceEnt;
 	int			damage;
 
 	// set aiming directions
-	AngleVectors (ent->client->ps.viewangles, forward, right, up);
+	if ( !G_VR_AimAngles( ent, viewang ) )
+	{
+		VectorCopy( ent->client->ps.viewangles, viewang );
+	}
+	AngleVectors (viewang, forward, right, up);
 
 	CalcMuzzlePoint ( ent, forward, right, up, muzzle );
 
@@ -785,9 +790,12 @@ set muzzle location relative to pivoting eye
 ===============
 */
 void CalcMuzzlePointOrigin ( gentity_t *ent, vec3_t origin, vec3_t localForward, vec3_t localRight, vec3_t localUp, vec3_t muzzlePoint ) {
-	VectorCopy( ent->s.pos.trBase, muzzlePoint );
-	muzzlePoint[2] += ent->client->ps.viewheight;
-	VectorMA( muzzlePoint, 14, localForward, muzzlePoint );
+	if ( !G_VR_MuzzlePoint( ent, localForward, localRight, localUp, origin, muzzlePoint ) )
+	{
+		VectorCopy( ent->s.pos.trBase, muzzlePoint );
+		muzzlePoint[2] += ent->client->ps.viewheight;
+		VectorMA( muzzlePoint, 14, localForward, muzzlePoint );
+	}
 	// snap to integer coordinates for more efficient network bandwidth usage
 	SnapVector( muzzlePoint );
 }
@@ -800,6 +808,8 @@ FireWeapon
 ===============
 */
 void FireWeapon( gentity_t *ent ) {
+	vec3_t viewang;
+
 	if (ent->client->ps.powerups[PW_QUAD] ) {
 		s_quadFactor = g_quadfactor.value;
 	} else {
@@ -825,7 +835,11 @@ void FireWeapon( gentity_t *ent ) {
 	}
 
 	// set aiming directions
-	AngleVectors (ent->client->ps.viewangles, forward, right, up);
+	if ( !G_VR_AimAngles( ent, viewang ) )
+	{
+		VectorCopy( ent->client->ps.viewangles, viewang );
+	}
+	AngleVectors (viewang, forward, right, up);
 
 	CalcMuzzlePointOrigin ( ent, ent->client->oldOrigin, forward, right, up, muzzle );
 

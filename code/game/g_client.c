@@ -703,6 +703,7 @@ if desired.
 void ClientUserinfoChanged( int clientNum ) {
 	gentity_t *ent;
 	int		teamTask, teamLeader, health;
+	qboolean	vrClient;
 	char	*s;
 	char	model[MAX_QPATH];
 	char	headModel[MAX_QPATH];
@@ -844,6 +845,9 @@ void ClientUserinfoChanged( int clientNum ) {
 	Q_strncpyz(redTeam, Info_ValueForKey( userinfo, "g_redteam" ), sizeof( redTeam ));
 	Q_strncpyz(blueTeam, Info_ValueForKey( userinfo, "g_blueteam" ), sizeof( blueTeam ));
 	
+	// every client, bots included, so a slot records its own VR flag
+	vrClient = G_VR_ClientUserinfoChanged( client, userinfo );
+
 	// send over a subset of the userinfo keys so other clients can
 	// print scoreboards, display models, and play custom sounds
 	if (ent->r.svFlags & SVF_BOT)
@@ -855,9 +859,10 @@ void ClientUserinfoChanged( int clientNum ) {
 	}
 	else
 	{
-		s = va("n\\%s\\t\\%i\\model\\%s\\hmodel\\%s\\g_redteam\\%s\\g_blueteam\\%s\\c1\\%s\\c2\\%s\\hc\\%i\\w\\%i\\l\\%i\\tt\\%d\\tl\\%d",
-			client->pers.netname, client->sess.sessionTeam, model, headModel, redTeam, blueTeam, c1, c2, 
-			client->pers.maxHealth, client->sess.wins, client->sess.losses, teamTask, teamLeader);
+		s = va("n\\%s\\t\\%i\\model\\%s\\hmodel\\%s\\g_redteam\\%s\\g_blueteam\\%s\\c1\\%s\\c2\\%s\\hc\\%i\\w\\%i\\l\\%i\\tt\\%d\\tl\\%d\\vr\\%s",
+			client->pers.netname, client->sess.sessionTeam, model, headModel, redTeam, blueTeam, c1, c2,
+			client->pers.maxHealth, client->sess.wins, client->sess.losses, teamTask, teamLeader,
+			vrClient ? "1" : "0" );
 	}
 
 	trap_SetConfigstring( CS_PLAYERS+clientNum, s );
