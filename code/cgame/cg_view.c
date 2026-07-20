@@ -323,7 +323,8 @@ void CG_OffsetFirstPersonView( void ) {
 	float			f;
 	vec3_t			predictedVelocity;
 	int				timeDelta;
-	
+	float			hitRollCoeff;
+
 	if ( cg.snap->ps.pm_type == PM_INTERMISSION ) {
 		return;
 	}
@@ -340,18 +341,20 @@ void CG_OffsetFirstPersonView( void ) {
 		return;
 	}
 
+	hitRollCoeff = CG_VR_DamageRollScale();
+
 	// add angles based on damage kick
 	if ( cg.damageTime ) {
 		ratio = cg.time - cg.damageTime;
 		if ( ratio < DAMAGE_DEFLECT_TIME ) {
 			ratio /= DAMAGE_DEFLECT_TIME;
-			angles[PITCH] += ratio * cg.v_dmg_pitch;
-			angles[ROLL] += ratio * cg.v_dmg_roll;
+			angles[PITCH] += ratio * cg.v_dmg_pitch * hitRollCoeff;
+			angles[ROLL] += ratio * cg.v_dmg_roll * hitRollCoeff;
 		} else {
 			ratio = 1.0 - ( ratio - DAMAGE_DEFLECT_TIME ) / DAMAGE_RETURN_TIME;
 			if ( ratio > 0 ) {
-				angles[PITCH] += ratio * cg.v_dmg_pitch;
-				angles[ROLL] += ratio * cg.v_dmg_roll;
+				angles[PITCH] += ratio * cg.v_dmg_pitch * hitRollCoeff;
+				angles[ROLL] += ratio * cg.v_dmg_roll * hitRollCoeff;
 			}
 		}
 	}
@@ -367,27 +370,31 @@ void CG_OffsetFirstPersonView( void ) {
 	// add angles based on velocity
 	VectorCopy( cg.predictedPlayerState.velocity, predictedVelocity );
 
-	delta = DotProduct ( predictedVelocity, cg.refdef.viewaxis[0]);
-	angles[PITCH] += delta * cg_runpitch.value;
-	
-	delta = DotProduct ( predictedVelocity, cg.refdef.viewaxis[1]);
-	angles[ROLL] -= delta * cg_runroll.value;
+	// run sway / view bob fight the headset-tracked camera; suppress at the
+	// application site so flatscreen keeps stock behavior and stock defaults
+	if ( !CG_VR_OwnsViewBob() ) {
+		delta = DotProduct ( predictedVelocity, cg.refdef.viewaxis[0]);
+		angles[PITCH] += delta * cg_runpitch.value;
 
-	// add angles based on bob
+		delta = DotProduct ( predictedVelocity, cg.refdef.viewaxis[1]);
+		angles[ROLL] -= delta * cg_runroll.value;
 
-	// make sure the bob is visible even at low speeds
-	speed = cg.xyspeed > 200 ? cg.xyspeed : 200;
+		// add angles based on bob
 
-	delta = cg.bobfracsin * cg_bobpitch.value * speed;
-	if (cg.predictedPlayerState.pm_flags & PMF_DUCKED)
-		delta *= 3;		// crouching
-	angles[PITCH] += delta;
-	delta = cg.bobfracsin * cg_bobroll.value * speed;
-	if (cg.predictedPlayerState.pm_flags & PMF_DUCKED)
-		delta *= 3;		// crouching accentuates roll
-	if (cg.bobcycle & 1)
-		delta = -delta;
-	angles[ROLL] += delta;
+		// make sure the bob is visible even at low speeds
+		speed = cg.xyspeed > 200 ? cg.xyspeed : 200;
+
+		delta = cg.bobfracsin * cg_bobpitch.value * speed;
+		if (cg.predictedPlayerState.pm_flags & PMF_DUCKED)
+			delta *= 3;		// crouching
+		angles[PITCH] += delta;
+		delta = cg.bobfracsin * cg_bobroll.value * speed;
+		if (cg.predictedPlayerState.pm_flags & PMF_DUCKED)
+			delta *= 3;		// crouching accentuates roll
+		if (cg.bobcycle & 1)
+			delta = -delta;
+		angles[ROLL] += delta;
+	}
 
 //===================================
 
@@ -401,13 +408,15 @@ void CG_OffsetFirstPersonView( void ) {
 			* (DUCK_TIME - timeDelta) / DUCK_TIME;
 	}
 
-	// add bob height
-	bob = cg.bobfracsin * cg.xyspeed * cg_bobup.value;
-	if (bob > 6) {
-		bob = 6;
+	// add bob height (suppressed in VR: the HMD overwrite discards bob angles
+	// but a bobbing origin would still shake the world)
+	if ( !CG_VR_OwnsViewBob() ) {
+		bob = cg.bobfracsin * cg.xyspeed * cg_bobup.value;
+		if (bob > 6) {
+			bob = 6;
+		}
+		origin[2] += bob;
 	}
-
-	origin[2] += bob;
 
 
 	// add fall height
@@ -539,6 +548,8 @@ static int CG_CalcFov( void ) {
 	cg.refdef.fov_x = fov_x;
 	cg.refdef.fov_y = fov_y;
 
+	CG_VR_Fov( &cg.refdef.fov_x, &cg.refdef.fov_y );
+
 	if ( !cg.zoomed ) {
 		cg.zoomSensitivity = 1;
 	} else {
@@ -613,6 +624,12 @@ Sets cg.refdef view values
 static int CG_CalcViewValues( void ) {
 	playerState_t	*ps;
 
+	// VR menu freeze: keep last frame's refdef, only vrect/fov update
+	if ( CG_VR_MenuViewFreeze() ) {
+		CG_CalcVrect();
+		return CG_CalcFov();
+	}
+
 	memset( &cg.refdef, 0, sizeof( cg.refdef ) );
 
 	// strings for in game rendering
@@ -639,9 +656,11 @@ static int CG_CalcViewValues( void ) {
 */
 	// intermission view
 	if ( ps->pm_type == PM_INTERMISSION ) {
-		VectorCopy( ps->origin, cg.refdef.vieworg );
-		VectorCopy( ps->viewangles, cg.refdefViewAngles );
-		AnglesToAxis( cg.refdefViewAngles, cg.refdef.viewaxis );
+		if ( !CG_VR_IntermissionView() ) {
+			VectorCopy( ps->origin, cg.refdef.vieworg );
+			VectorCopy( ps->viewangles, cg.refdefViewAngles );
+			AnglesToAxis( cg.refdefViewAngles, cg.refdef.viewaxis );
+		}
 		return CG_CalcFov();
 	}
 
@@ -653,6 +672,8 @@ static int CG_CalcViewValues( void ) {
 
 	VectorCopy( ps->origin, cg.refdef.vieworg );
 	VectorCopy( ps->viewangles, cg.refdefViewAngles );
+
+	CG_VR_FollowHeadView( ps );
 
 	if (cg_cameraOrbit.integer) {
 		if (cg.time > cg.nextOrbitTime) {
@@ -674,16 +695,22 @@ static int CG_CalcViewValues( void ) {
 		}
 	}
 
-	if ( cg.renderingThirdPerson ) {
-		// back away from character
-		CG_OffsetThirdPersonView();
-	} else {
-		// offset for local bobbing and kicks
-		CG_OffsetFirstPersonView();
+	if ( !CG_VR_OffsetView() ) {
+		if ( cg.renderingThirdPerson ) {
+			// back away from character
+			CG_OffsetThirdPersonView();
+		} else {
+			// offset for local bobbing and kicks
+			CG_OffsetFirstPersonView();
+		}
 	}
 
+	CG_VR_ComputeWeaponAngles();
+
 	// position eye relative to origin
-	AnglesToAxis( cg.refdefViewAngles, cg.refdef.viewaxis );
+	if ( !CG_VR_ViewAxis() ) {
+		AnglesToAxis( cg.refdefViewAngles, cg.refdef.viewaxis );
+	}
 
 	if ( cg.hyperspace ) {
 		cg.refdef.rdflags |= RDF_NOWORLDMODEL | RDF_HYPERSPACE;
@@ -767,6 +794,8 @@ void CG_DrawActiveFrame( int serverTime, stereoFrame_t stereoView, qboolean demo
 	// update cvars
 	CG_UpdateCvars();
 
+	CG_VR_Frame();
+
 	// if we are only updating the screen as a loading
 	// pacifier, don't even try to read snapshots
 	if ( cg.infoScreenText[0] != 0 ) {
@@ -804,6 +833,11 @@ void CG_DrawActiveFrame( int serverTime, stereoFrame_t stereoView, qboolean demo
 	cg.renderingThirdPerson = cg.snap->ps.persistant[PERS_TEAM] != TEAM_SPECTATOR
 							&& (cg_thirdPerson.integer || (cg.snap->ps.stats[STAT_HEALTH] <= 0));
 
+	// VR spectator/demo/follow camera modes also render in third person
+	if ( CG_VR_ForceThirdPerson() ) {
+		cg.renderingThirdPerson = qtrue;
+	}
+
 	// build cg.refdef
 	inwater = CG_CalcViewValues();
 
@@ -819,7 +853,16 @@ void CG_DrawActiveFrame( int serverTime, stereoFrame_t stereoView, qboolean demo
 		CG_AddParticles ();
 		CG_AddLocalEntities();
 	}
+	// Process weapon adjustment mode (reads thumbstick, updates cvars)
+	CG_WeaponAdjustFrame();
 	CG_AddViewWeapon( &cg.predictedPlayerState );
+
+	// VR follow: add 3D crosshair at weapon aim point (first-person only).
+	// In VR the primary CG_VR_DrawFrame crosshair site already covers follow
+	// mode; gate this flatscreen site off when vrActive to avoid a double blend.
+	if ( !vrActive && !cg.renderingThirdPerson && CG_VR_IsVRFollow() ) {
+		CG_DrawCrosshair3D();
+	}
 
 	// add buffered sounds
 	CG_PlayBufferedSounds();
@@ -869,6 +912,11 @@ void CG_DrawActiveFrame( int serverTime, stereoFrame_t stereoView, qboolean demo
 
 	// actually issue the rendering calls
 	CG_DrawActive( stereoView );
+
+	// VR API conformance probe overlay; when VR is active the draw tail
+	// renders it inside the protected 2D bracket instead
+	if ( !vrActive )
+		CG_VRProbe_Draw();
 
 	if ( cg_stats.integer ) {
 		CG_Printf( "cg.clientFrame:%i\n", cg.clientFrame );

@@ -297,6 +297,9 @@ void CG_Draw3DModel( float x, float y, float w, float h, qhandle_t model, qhandl
 
 	refdef.time = cg.time;
 
+	// mini-scene inside the 2D pass: route it to the HUD surface in VR
+	refdef.isHUD = qtrue;
+
 	trap_R_ClearScene();
 	trap_R_AddRefEntityToScene( &ent );
 	trap_R_RenderScene( &refdef );
@@ -422,8 +425,13 @@ static void CG_DrawStatusBarHead( float x ) {
 	vec3_t		angles;
 	float		size, stretch;
 	float		frac;
+	qboolean	vr;
 
 	VectorClear( angles );
+
+	// VR players: portrait reflects the real head orientation (current player,
+	// followed player, or demo). Falls back to the random idle-bob otherwise.
+	vr = CG_VR_PortraitHeadAngles( angles );
 
 	if ( cg.damageTime && cg.time - cg.damageTime < DAMAGE_TIME ) {
 		frac = (float)(cg.time - cg.damageTime ) / DAMAGE_TIME;
@@ -433,15 +441,20 @@ static void CG_DrawStatusBarHead( float x ) {
 		// kick in the direction of damage
 		x -= stretch * 0.5 + cg.damageX * stretch * 0.5;
 
-		cg.headStartYaw = 180 + cg.damageX * 45;
+		if ( vr ) {
+			// additive damage kick on top of the real head orientation
+			angles[YAW] += cg.damageX * 45;
+		} else {
+			cg.headStartYaw = 180 + cg.damageX * 45;
 
-		cg.headEndYaw = 180 + 20 * cos( crandom()*M_PI );
-		cg.headEndPitch = 5 * cos( crandom()*M_PI );
+			cg.headEndYaw = 180 + 20 * cos( crandom()*M_PI );
+			cg.headEndPitch = 5 * cos( crandom()*M_PI );
 
-		cg.headStartTime = cg.time;
-		cg.headEndTime = cg.time + 100 + random() * 2000;
+			cg.headStartTime = cg.time;
+			cg.headEndTime = cg.time + 100 + random() * 2000;
+		}
 	} else {
-		if ( cg.time >= cg.headEndTime ) {
+		if ( !vr && cg.time >= cg.headEndTime ) {
 			// select a new head angle
 			cg.headStartYaw = cg.headEndYaw;
 			cg.headStartPitch = cg.headEndPitch;
@@ -455,17 +468,19 @@ static void CG_DrawStatusBarHead( float x ) {
 		size = ICON_SIZE * 1.25;
 	}
 
-	// if the server was frozen for a while we may have a bad head start time
-	if ( cg.headStartTime > cg.time ) {
-		cg.headStartTime = cg.time;
+	if ( !vr ) {
+		// if the server was frozen for a while we may have a bad head start time
+		if ( cg.headStartTime > cg.time ) {
+			cg.headStartTime = cg.time;
+		}
+
+		frac = ( cg.time - cg.headStartTime ) / (float)( cg.headEndTime - cg.headStartTime );
+		frac = frac * frac * ( 3 - 2 * frac );
+		angles[YAW] = cg.headStartYaw + ( cg.headEndYaw - cg.headStartYaw ) * frac;
+		angles[PITCH] = cg.headStartPitch + ( cg.headEndPitch - cg.headStartPitch ) * frac;
 	}
 
-	frac = ( cg.time - cg.headStartTime ) / (float)( cg.headEndTime - cg.headStartTime );
-	frac = frac * frac * ( 3 - 2 * frac );
-	angles[YAW] = cg.headStartYaw + ( cg.headEndYaw - cg.headStartYaw ) * frac;
-	angles[PITCH] = cg.headStartPitch + ( cg.headEndPitch - cg.headStartPitch ) * frac;
-
-	CG_DrawHead( x, 480 - size, size, size, 
+	CG_DrawHead( x, 480 - size, size, size,
 				cg.snap->ps.clientNum, angles );
 }
 #endif // MISSIONPACK
@@ -532,7 +547,7 @@ static void CG_DrawStatusBar( void ) {
 		{ 0.5f, 0.5f, 0.5f, 1.0f },     // weapon firing
 		{ 1.0f, 1.0f, 1.0f, 1.0f } };   // health > 100
 
-	if ( cg_drawStatus.integer == 0 ) {
+	if ( !CG_VR_OwnsHudVisibility() && cg_drawStatus.integer == 0 ) {
 		return;
 	}
 
@@ -1278,7 +1293,9 @@ CG_DrawLowerRight
 static void CG_DrawLowerRight( void ) {
 	float	y;
 
-	y = 480 - ICON_SIZE;
+	// Minimal (zoomed) HUD doesn't draw the status bar, so don't reserve
+	// space for it — anchor scores/powerups to the actual bottom edge.
+	y = CG_VR_DrawingZoomedHUD() ? 480 : 480 - ICON_SIZE;
 
 	if ( cgs.gametype >= GT_TEAM && cg_drawTeamOverlay.integer == 2 ) {
 		y = CG_DrawTeamOverlay( y, qtrue, qfalse );
@@ -1420,7 +1437,10 @@ static void CG_DrawHoldableItem( void ) {
 	value = cg.snap->ps.stats[STAT_HOLDABLE_ITEM];
 	if ( value ) {
 		CG_RegisterItemVisuals( value );
-		CG_DrawPic( 640-ICON_SIZE, (SCREEN_HEIGHT-ICON_SIZE)/2, ICON_SIZE, ICON_SIZE, cg_items[ value ].icon );
+
+		if ( !CG_VR_OwnsHoldableIcon() ) {
+			CG_DrawPic( 640-ICON_SIZE, (SCREEN_HEIGHT-ICON_SIZE)/2, ICON_SIZE, ICON_SIZE, cg_items[ value ].icon );
+		}
 	}
 
 }
@@ -1881,6 +1901,11 @@ static void CG_DrawCrosshair(void)
 		return;
 	}
 
+	// VR follow uses a 3D crosshair at the weapon aim point instead
+	if ( CG_VR_IsVRFollow() ) {
+		return;
+	}
+
 	// set color based on health
 	if ( cg_crosshairHealth.integer ) {
 		vec4_t		hcolor;
@@ -1935,8 +1960,16 @@ void CG_DrawCrosshair3D(void)
 	float stereoSep, zProj, maxdist, xmax;
 	char rendererinfos[128];
 	refEntity_t ent;
+	vec3_t viewaxis[3];
+	vec3_t weaponangles;
+	vec3_t origin;
 
-	if ( !cg_drawCrosshair.integer ) {
+	if ( !cg_drawCrosshair.integer || vr->no_crosshair ) {
+		return;
+	}
+
+	if (cg.snap->ps.pm_type == PM_INTERMISSION)
+	{
 		return;
 	}
 
@@ -1944,7 +1977,7 @@ void CG_DrawCrosshair3D(void)
 		return;
 	}
 
-	if ( cg.renderingThirdPerson ) {
+	if ( cg.renderingThirdPerson || CG_VR_IsDeathCam()) {
 		return;
 	}
 
@@ -1971,24 +2004,58 @@ void CG_DrawCrosshair3D(void)
 	trap_Cvar_VariableStringBuffer("r_zProj", rendererinfos, sizeof(rendererinfos));
 	zProj = atof(rendererinfos);
 	trap_Cvar_VariableStringBuffer("r_stereoSeparation", rendererinfos, sizeof(rendererinfos));
-	stereoSep = zProj / atof(rendererinfos);
-	
+	stereoSep = atof(rendererinfos);
+
 	xmax = zProj * tan(cg.refdef.fov_x * M_PI / 360.0f);
-	
+
 	// let the trace run through until a change in stereo separation of the crosshair becomes less than one pixel.
-	maxdist = cgs.glconfig.vidWidth * stereoSep * zProj / (2 * xmax);
-	VectorMA(cg.refdef.vieworg, maxdist, cg.refdef.viewaxis[0], endpos);
-	CG_Trace(&trace, cg.refdef.vieworg, NULL, NULL, endpos, 0, MASK_SHOT);
-	
+	CG_CalculateVRWeaponPosition(origin, weaponangles);
+	AnglesToAxis(weaponangles, viewaxis);
+	if (stereoSep > 0.0f) {
+		maxdist = (cgs.glconfig.vidWidth * (zProj / stereoSep) * zProj / (2 * xmax)) * 1.5f;
+	} else {
+		// r_stereoSeparation 0 is settable (and archivable in old configs);
+		// use a fixed far trace instead of an infinite one
+		maxdist = 8192.0f;
+	}
+	VectorMA(origin, maxdist, viewaxis[0], endpos);
+	CG_Trace(&trace, origin, NULL, NULL, endpos, 0, MASK_SHOT);
+
 	memset(&ent, 0, sizeof(ent));
 	ent.reType = RT_SPRITE;
 	ent.renderfx = RF_DEPTHHACK | RF_CROSSHAIR;
-	
+
 	VectorCopy(trace.endpos, ent.origin);
-	
+
 	// scale the crosshair so it appears the same size for all distances
-	ent.radius = w / 640 * xmax * trace.fraction * maxdist / zProj;
+	// Position is based on weapon aim, but size is based on distance from eyes
+	{
+		vec3_t delta;
+		float distance;
+		VectorSubtract(trace.endpos, cg.refdef.vieworg, delta);
+		distance = VectorLength(delta);
+
+		// Scale radius proportional to distance to maintain constant angular size
+		// radius = (normalized_size) * distance * tan(half_fov)
+		ent.radius = (w / 640.0f) * distance * tan(cg.refdef.fov_x * M_PI / 360.0f);
+	}
 	ent.customShader = hShader;
+
+	// set crosshair color; the sprite is vertex-modulated, so an unset
+	// color renders black
+	if ( cg_crosshairHealth.integer ) {
+		vec4_t hcolor;
+		CG_ColorForHealth( hcolor );
+		ent.shaderRGBA[0] = (byte)(hcolor[0] * 255);
+		ent.shaderRGBA[1] = (byte)(hcolor[1] * 255);
+		ent.shaderRGBA[2] = (byte)(hcolor[2] * 255);
+		ent.shaderRGBA[3] = (byte)(hcolor[3] * 255);
+	} else {
+		ent.shaderRGBA[0] = 255;
+		ent.shaderRGBA[1] = 255;
+		ent.shaderRGBA[2] = 255;
+		ent.shaderRGBA[3] = 255;
+	}
 
 	trap_R_AddRefEntityToScene(&ent);
 }
@@ -2005,8 +2072,10 @@ static void CG_ScanForCrosshairEntity( void ) {
 	vec3_t		start, end;
 	int			content;
 
-	VectorCopy( cg.refdef.vieworg, start );
-	VectorMA( start, 131072, cg.refdef.viewaxis[0], end );
+	if ( !CG_VR_CrosshairScanRay( start, end ) ) {
+		VectorCopy( cg.refdef.vieworg, start );
+		VectorMA( start, 131072, cg.refdef.viewaxis[0], end );
+	}
 
 	CG_Trace( &trace, start, vec3_origin, vec3_origin, end, 
 		cg.snap->ps.clientNum, CONTENTS_SOLID|CONTENTS_BODY );
@@ -2160,6 +2229,63 @@ static void CG_DrawTeamVote(void) {
 	CG_DrawSmallString( 0, 90, s, 1.0F );
 }
 
+#define	VOTE_HOLD_TIME		1000		// ms to hold A/B before vote registers
+
+/*
+=================
+CG_ProcessVoteHold
+
+Reads CG_VR_VoteHolding() each frame and manages the hold-to-vote timer.
+Sends the vote command when the hold threshold is reached, so a VR
+controller can hold to confirm instead of needing a keyboard F1/F2.
+=================
+*/
+static void CG_ProcessVoteHold( void ) {
+	static int	holdStartTime;
+	static int	holdButton;
+	int			button;
+	int			cs_offset;
+	qboolean	teamVote;
+	qboolean	voteActive;
+
+	if ( cgs.clientinfo[cg.clientNum].team == TEAM_RED )
+		cs_offset = 0;
+	else if ( cgs.clientinfo[cg.clientNum].team == TEAM_BLUE )
+		cs_offset = 1;
+	else
+		cs_offset = -1;
+
+	teamVote = ( cs_offset >= 0 && cgs.teamVoteTime[cs_offset] );
+	voteActive = ( cgs.voteTime != 0 ) || teamVote;
+
+	// Check if any yes/no dialog is active for VR button intercept.
+	CG_VR_SetVoteActive( voteActive );
+
+	button = CG_VR_VoteHolding();
+	if ( !voteActive || button == 0 ) {
+		// released or nothing to vote on — cancel hold
+		holdStartTime = 0;
+		holdButton = 0;
+		return;
+	}
+
+	if ( holdButton != button ) {
+		// started holding a new button — restart
+		holdStartTime = cg.time;
+		holdButton = button;
+	}
+
+	if ( cg.time - holdStartTime >= VOTE_HOLD_TIME ) {
+		if ( cgs.voteTime ) {
+			trap_SendConsoleCommand( holdButton == 1 ? "vote yes\n" : "vote no\n" );
+		} else {
+			trap_SendConsoleCommand( holdButton == 1 ? "teamvote yes\n" : "teamvote no\n" );
+		}
+		holdStartTime = 0;
+		holdButton = 0;
+	}
+}
+
 
 static qboolean CG_DrawScoreboard( void ) {
 #ifdef MISSIONPACK
@@ -2186,7 +2312,7 @@ static qboolean CG_DrawScoreboard( void ) {
 		return qfalse;
 	}
 
-	if ( cg.showScores || cg.predictedPlayerState.pm_type == PM_DEAD || cg.predictedPlayerState.pm_type == PM_INTERMISSION ) {
+	if ( cg.showScores || (cg.predictedPlayerState.pm_type == PM_DEAD && !CG_VR_SuppressDeadScoreboard()) || cg.predictedPlayerState.pm_type == PM_INTERMISSION ) {
 	} else {
 		if ( !CG_FadeColor( cg.scoreFadeTime, FADE_TIME ) ) {
 			// next time scoreboard comes up, don't print killer
@@ -2531,7 +2657,9 @@ void CG_Draw2D(stereoFrame_t stereoFrame)
 		return;
 	}
 
-	if ( cg_draw2D.integer == 0 ) {
+	// cg_draw2D is flatscreen-only; VR HUD visibility belongs to the
+	// vr_hudDrawStatus ladder (VR_INTEGRATION.md Appendix A)
+	if ( !CG_VR_OwnsHudVisibility() && cg_draw2D.integer == 0 ) {
 		return;
 	}
 
@@ -2548,7 +2676,7 @@ void CG_Draw2D(stereoFrame_t stereoFrame)
 	if ( cg.snap->ps.persistant[PERS_TEAM] == TEAM_SPECTATOR ) {
 		CG_DrawSpectator();
 
-		if(stereoFrame == STEREO_CENTER)
+		if(stereoFrame == STEREO_CENTER && !CG_VR_Owns2DCrosshair())
 			CG_DrawCrosshair();
 
 		CG_DrawCrosshairNames();
@@ -2557,23 +2685,28 @@ void CG_Draw2D(stereoFrame_t stereoFrame)
 		if ( !cg.showScores && cg.snap->ps.stats[STAT_HEALTH] > 0 ) {
 
 #ifdef MISSIONPACK
-			if ( cg_drawStatus.integer ) {
+			// cg_drawStatus is flatscreen-only; VR HUD visibility is the
+			// vr_hudDrawStatus ladder - see CG_VR_HudVisible/
+			// CG_VR_OwnsHudVisibility in vr_cgame.c
+			if ( CG_VR_HudVisible() && ( CG_VR_OwnsHudVisibility() || cg_drawStatus.integer ) ) {
 				Menu_PaintAll();
 				CG_DrawTimedMenus();
 			}
 #else
 			CG_DrawStatusBar();
 #endif
-      
+
 			CG_DrawAmmoWarning();
 
 #ifdef MISSIONPACK
 			CG_DrawProxWarning();
-#endif      
-			if(stereoFrame == STEREO_CENTER)
+#endif
+			if(stereoFrame == STEREO_CENTER && !CG_VR_Owns2DCrosshair())
 				CG_DrawCrosshair();
 			CG_DrawCrosshairNames();
-			CG_DrawWeaponSelect();
+			if ( !CG_VR_OwnsWeaponSelect() ) {
+				CG_DrawWeaponSelect();
+			}
 
 #ifndef MISSIONPACK
 			CG_DrawHoldableItem();
@@ -2592,6 +2725,8 @@ void CG_Draw2D(stereoFrame_t stereoFrame)
 
 	CG_DrawVote();
 	CG_DrawTeamVote();
+
+	CG_ProcessVoteHold();
 
 	CG_DrawLagometer();
 
@@ -2623,16 +2758,65 @@ void CG_Draw2D(stereoFrame_t stereoFrame)
 ==============
 CG_GetProjectionCenter
 
-The projection's optical center in virtual 640x480 coordinates. This host
-renders symmetric FOVs, so the center is the geometric center; a host with
-asymmetric per-eye FOVs computes the offset from its projection matrix
-(take trinity's implementation).
+Calculates the optical center of the VR projection in virtual 640x480 coordinates.
+
+VR headsets have asymmetric FOV (more down-look than up-look), which causes the
+OpenXR projection matrix to shift the optical center away from the geometric
+framebuffer center. This function computes that offset based on the current FOV
+angles and weapon zoom level.
+
+The OpenGL projection matrix elements m[8] and m[9] determine the horizontal and
+vertical offsets:
+  m[8] = (tanRight + tanLeft) / (tanRight - tanLeft)
+  m[9] = (tanUp + tanDown) / (tanUp - tanDown)
+
+A point along the view axis (straight ahead) projects to NDC position (-m[8], -m[9]).
+Converting to screen coordinates (with 0,0 at top-left):
+  screenX = 320 * (1 + m[8])
+  screenY = 240 * (1 + m[9])
 ==============
 */
 void CG_GetProjectionCenter( float *outX, float *outY )
 {
-	if (outX) *outX = 320.0f;
-	if (outY) *outY = 240.0f;
+	// Default to geometric center
+	float x = 320.0f;
+	float y = 240.0f;
+	float zoomLevel;
+	float angleUp, angleDown, angleLeft, angleRight;
+	float tanUp, tanDown, tanLeft, tanRight;
+	float tanHeightV, tanWidthH;
+
+	// Get the effective FOV angles, accounting for weapon zoom
+	// The projection matrix in vr_renderer.c divides angles by weapon_zoomLevel
+	zoomLevel = vr->weapon_zoomLevel;
+	if (zoomLevel < 1.0f) zoomLevel = 1.0f;
+
+	angleUp = vr->fov_angle_up / zoomLevel;
+	angleDown = vr->fov_angle_down / zoomLevel;
+	angleLeft = vr->fov_angle_left / zoomLevel;
+	angleRight = vr->fov_angle_right / zoomLevel;
+
+	tanUp = tan(angleUp);
+	tanDown = tan(angleDown);
+	tanLeft = tan(angleLeft);
+	tanRight = tan(angleRight);
+
+	// Vertical: m[9] = (tanUp + tanDown) / (tanUp - tanDown)
+	tanHeightV = tanUp - tanDown;
+	if (fabs(tanHeightV) > 0.001f) {
+		float m9 = (tanUp + tanDown) / tanHeightV;
+		y = 240.0f * (1.0f + m9);
+	}
+
+	// Horizontal: m[8] = (tanRight + tanLeft) / (tanRight - tanLeft)
+	tanWidthH = tanRight - tanLeft;
+	if (fabs(tanWidthH) > 0.001f) {
+		float m8 = (tanRight + tanLeft) / tanWidthH;
+		x = 320.0f * (1.0f + m8);
+	}
+
+	if (outX) *outX = x;
+	if (outY) *outY = y;
 }
 
 /*
@@ -2645,6 +2829,11 @@ more or less identical to non-minimal HUD, just in case.
 */
 void CG_Draw2DMinimal( stereoFrame_t stereoView )
 {
+	// If the HUD is disabled, we don't want this content
+	if ( !CG_VR_HudVisible() ) {
+		return;
+	}
+
 	if ( cg.snap->ps.pm_type == PM_INTERMISSION ) {
 		return;
 	}
@@ -2725,6 +2914,10 @@ void CG_DrawActive( stereoFrame_t stereoView ) {
 
 	// clear around the rendered view if sized down
 	CG_TileClear();
+
+	if ( CG_VR_DrawFrame( stereoView ) ) {
+		return;
+	}
 
 	if(stereoView != STEREO_CENTER)
 		CG_DrawCrosshair3D();

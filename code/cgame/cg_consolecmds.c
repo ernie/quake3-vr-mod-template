@@ -470,6 +470,10 @@ static consoleCommand_t	commands[] = {
 	{ "tcmd", CG_TargetCommand_f },
 	{ "tell_target", CG_TellTarget_f },
 	{ "tell_attacker", CG_TellAttacker_f },
+	{ "weapon_select", CG_WeaponSelectorSelect_f },
+	{ "weapon_adjust", CG_WeaponAdjust_f },
+	{ "weapon_adjust_reset", CG_WeaponAdjustReset_f },
+	{ "weapon_adjust_reset_all", CG_WeaponAdjustResetAll_f },
 #ifdef MISSIONPACK
 	{ "vtell_target", CG_VoiceTellTarget_f },
 	{ "vtell_attacker", CG_VoiceTellAttacker_f },

@@ -165,7 +165,7 @@ static void CG_DrawPlayerArmorIcon( rectDef_t *rect, qboolean draw2D ) {
 	vec3_t		angles;
 	vec3_t		origin;
 
-	if ( cg_drawStatus.integer == 0 ) {
+	if ( !CG_VR_OwnsHudVisibility() && cg_drawStatus.integer == 0 ) {
 		return;
 	}
 
@@ -259,8 +259,13 @@ static void CG_DrawPlayerHead(rectDef_t *rect, qboolean draw2D) {
 	float		size, stretch;
 	float		frac;
 	float		x = rect->x;
+	qboolean	vr;
 
 	VectorClear( angles );
+
+	// VR players: portrait reflects the real head orientation (current player,
+	// followed player, or demo). Falls back to the random idle-bob otherwise.
+	vr = CG_VR_PortraitHeadAngles( angles );
 
 	if ( cg.damageTime && cg.time - cg.damageTime < DAMAGE_TIME ) {
 		frac = (float)(cg.time - cg.damageTime ) / DAMAGE_TIME;
@@ -270,15 +275,20 @@ static void CG_DrawPlayerHead(rectDef_t *rect, qboolean draw2D) {
 		// kick in the direction of damage
 		x -= stretch * 0.5 + cg.damageX * stretch * 0.5;
 
-		cg.headStartYaw = 180 + cg.damageX * 45;
+		if ( vr ) {
+			// additive damage kick on top of the real head orientation
+			angles[YAW] += cg.damageX * 45;
+		} else {
+			cg.headStartYaw = 180 + cg.damageX * 45;
 
-		cg.headEndYaw = 180 + 20 * cos( crandom()*M_PI );
-		cg.headEndPitch = 5 * cos( crandom()*M_PI );
+			cg.headEndYaw = 180 + 20 * cos( crandom()*M_PI );
+			cg.headEndPitch = 5 * cos( crandom()*M_PI );
 
-		cg.headStartTime = cg.time;
-		cg.headEndTime = cg.time + 100 + random() * 2000;
+			cg.headStartTime = cg.time;
+			cg.headEndTime = cg.time + 100 + random() * 2000;
+		}
 	} else {
-		if ( cg.time >= cg.headEndTime ) {
+		if ( !vr && cg.time >= cg.headEndTime ) {
 			// select a new head angle
 			cg.headStartYaw = cg.headEndYaw;
 			cg.headStartPitch = cg.headEndPitch;
@@ -290,15 +300,17 @@ static void CG_DrawPlayerHead(rectDef_t *rect, qboolean draw2D) {
 		}
 	}
 
-	// if the server was frozen for a while we may have a bad head start time
-	if ( cg.headStartTime > cg.time ) {
-		cg.headStartTime = cg.time;
-	}
+	if ( !vr ) {
+		// if the server was frozen for a while we may have a bad head start time
+		if ( cg.headStartTime > cg.time ) {
+			cg.headStartTime = cg.time;
+		}
 
-	frac = ( cg.time - cg.headStartTime ) / (float)( cg.headEndTime - cg.headStartTime );
-	frac = frac * frac * ( 3 - 2 * frac );
-	angles[YAW] = cg.headStartYaw + ( cg.headEndYaw - cg.headStartYaw ) * frac;
-	angles[PITCH] = cg.headStartPitch + ( cg.headEndPitch - cg.headStartPitch ) * frac;
+		frac = ( cg.time - cg.headStartTime ) / (float)( cg.headEndTime - cg.headStartTime );
+		frac = frac * frac * ( 3 - 2 * frac );
+		angles[YAW] = cg.headStartYaw + ( cg.headEndYaw - cg.headStartYaw ) * frac;
+		angles[PITCH] = cg.headStartPitch + ( cg.headEndPitch - cg.headStartPitch ) * frac;
+	}
 
 	CG_DrawHead( x, rect->y, rect->w, rect->h, cg.snap->ps.clientNum, angles );
 }
@@ -1101,15 +1113,15 @@ static void CG_DrawPlayerHasFlag(rectDef_t *rect, qboolean force2D) {
 }
 
 static void CG_DrawAreaSystemChat(rectDef_t *rect, float scale, vec4_t color, qhandle_t shader) {
-  CG_Text_Paint(rect->x, rect->y + rect->h, scale, color, systemChat, 0, 0, 0);
+  CG_Text_Paint(rect->x + CG_VR_ChatOffsetX(), rect->y + rect->h + CG_VR_ChatOffsetY(), scale, color, systemChat, 0, 0, 0);
 }
 
 static void CG_DrawAreaTeamChat(rectDef_t *rect, float scale, vec4_t color, qhandle_t shader) {
-  CG_Text_Paint(rect->x, rect->y + rect->h, scale, color,teamChat1, 0, 0, 0);
+  CG_Text_Paint(rect->x + CG_VR_ChatOffsetX(), rect->y + rect->h + CG_VR_ChatOffsetY(), scale, color,teamChat1, 0, 0, 0);
 }
 
 static void CG_DrawAreaChat(rectDef_t *rect, float scale, vec4_t color, qhandle_t shader) {
-  CG_Text_Paint(rect->x, rect->y + rect->h, scale, color, teamChat2, 0, 0, 0);
+  CG_Text_Paint(rect->x + CG_VR_ChatOffsetX(), rect->y + rect->h + CG_VR_ChatOffsetY(), scale, color, teamChat2, 0, 0, 0);
 }
 
 const char *CG_GetKillerText(void) {
@@ -1496,7 +1508,10 @@ void CG_DrawMedal(int ownerDraw, rectDef_t *rect, float scale, vec4_t color, qha
 void CG_OwnerDraw(float x, float y, float w, float h, float text_x, float text_y, int ownerDraw, int ownerDrawFlags, int align, float special, float scale, vec4_t color, qhandle_t shader, int textStyle) {
 	rectDef_t rect;
 
-  if ( cg_drawStatus.integer == 0 ) {
+	if ( !CG_VR_HudVisible() ) {
+		return;
+	}
+	if ( !CG_VR_OwnsHudVisibility() && cg_drawStatus.integer == 0 ) {
 		return;
 	}
 
@@ -1682,6 +1697,10 @@ void CG_OwnerDraw(float x, float y, float w, float h, float text_x, float text_y
 
 void CG_MouseEvent(int x, int y) {
 	int n;
+
+	if ( CG_VR_ScoreboardCursor( &cgs.cursorX, &cgs.cursorY ) ) {
+		return;
+	}
 
 	if ( (cg.predictedPlayerState.pm_type == PM_NORMAL || cg.predictedPlayerState.pm_type == PM_SPECTATOR) && cg.showScores == qfalse) {
     trap_Key_SetCatcher(0);

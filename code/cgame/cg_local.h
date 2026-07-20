@@ -1053,8 +1053,8 @@ typedef struct {
 	int				teamChatPos;
 	int				teamLastChatPos;
 
-	int cursorX;
-	int cursorY;
+	float cursorX;
+	float cursorY;
 	qboolean eventHandling;
 	qboolean mouseCaptured;
 	qboolean sizingHud;
