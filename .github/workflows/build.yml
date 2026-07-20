@@ -1,0 +1,30 @@
+name: Build
+
+on:
+  push:
+    branches: [main, "v*"]
+  pull_request:
+    branches: [main, "v*"]
+  workflow_dispatch:
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v7
+        with:
+          submodules: recursive
+
+      - name: Install dependencies
+        run: sudo apt-get update && sudo apt-get install -y build-essential p7zip-full
+
+      - name: Build pk3 files
+        run: make
+
+      - name: Upload artifacts
+        uses: actions/upload-artifact@v7
+        with:
+          name: vr-template
+          path: dist/*.pk3
