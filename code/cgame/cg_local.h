@@ -24,6 +24,7 @@ Foundation, Inc., 51 Franklin St, Fifth Floor, Boston, MA  02110-1301  USA
 #include "../renderercommon/tr_types.h"
 #include "../game/bg_public.h"
 #include "cg_public.h"
+#include "../game/vr_shared.h"
 
 
 // The entire cgame module is unloaded and reloaded on each level change,
@@ -1686,5 +1687,42 @@ void	CG_ParticleMisc (qhandle_t pshader, vec3_t origin, int size, int duration, 
 void	CG_ParticleExplosion (char *animStr, vec3_t origin, vec3_t vel, int duration, int sizeStart, int sizeEnd);
 extern qboolean		initparticles;
 int CG_NewParticleArea ( int num );
+
+// extension interface
+
+#ifdef Q3_VM
+extern qboolean (*trap_GetValue)( char *value, int valueSize, const char *key );
+extern void	(*trap_VR_RegisterState)( void *state, int stateSize, int apiMajor, int apiMinor );
+#else
+qboolean trap_GetValue( char *value, int valueSize, const char *key );
+void trap_VR_RegisterState( void *state, int stateSize, int apiMajor, int apiMinor );
+extern int dll_com_trapGetValue;
+extern int dll_trap_VR_RegisterState;
+#endif
+
+// VR shared-state mirror (vr_cgame.c); zeroed/dormant on flatscreen engines
+extern vr_shared_t vr_state;
+extern vr_shared_t *vr;
+extern qboolean vrActive;
+
+#ifdef Q3_VM
+extern void	(*trap_R_SceneComplete)( void );
+extern void	(*trap_R_HUDBufferStart)( qboolean clear );
+extern void	(*trap_R_HUDBufferEnd)( void );
+extern void	(*trap_HapticEvent)( const char *event, int position, int channel, int intensity, float yaw, float height );
+#else
+void trap_R_SceneComplete( void );
+void trap_R_HUDBufferStart( qboolean clear );
+void trap_R_HUDBufferEnd( void );
+void trap_HapticEvent( const char *event, int position, int channel, int intensity, float yaw, float height );
+extern int dll_trap_R_SceneComplete;
+extern int dll_trap_R_HUDBufferStart;
+extern int dll_trap_R_HUDBufferEnd;
+extern int dll_trap_HapticEvent;
+#endif
+
+#include "vr_host_config.h"
+#include "vr_host.h"
+#include "vr_cgame.h"
 
 

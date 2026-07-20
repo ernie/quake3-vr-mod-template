@@ -34,6 +34,15 @@ int forceModelModificationCount = -1;
 void CG_Init( int serverMessageNum, int serverCommandSequence, int clientNum );
 void CG_Shutdown( void );
 
+// extension interface
+#ifdef Q3_VM
+qboolean (*trap_GetValue)( char *value, int valueSize, const char *key );
+void (*trap_VR_RegisterState)( void *state, int stateSize, int apiMajor, int apiMinor );
+#else
+int dll_com_trapGetValue;
+int dll_trap_VR_RegisterState;
+#endif
+
 
 /*
 ================
@@ -943,8 +952,11 @@ static void CG_RegisterGraphics( void ) {
 	cgs.media.dustPuffShader = trap_R_RegisterShader("hasteSmokePuff" );
 #endif
 
+	// registered in every gametype: the VR weapon wheel's selection marker
+	// draws through this handle
+	cgs.media.friendShader = trap_R_RegisterShader( "sprites/foe" );
+
 	if ( cgs.gametype >= GT_TEAM || cg_buildScript.integer ) {
-		cgs.media.friendShader = trap_R_RegisterShader( "sprites/foe" );
 		cgs.media.redQuadShader = trap_R_RegisterShader("powerups/blueflag" );
 		cgs.media.teamStatusBar = trap_R_RegisterShader( "gfx/2d/colorbar.tga" );
 #ifdef MISSIONPACK

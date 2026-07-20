@@ -4629,7 +4629,8 @@ void BotCheckConsoleMessages(bot_state_t *bs) {
 		//if it is a chat message then don't unify white spaces and don't
 		//replace synonyms in the netname
 		if (m.type == CMS_CHAT) {
-			//
+			//stock botlibs write only the offset's low byte
+			memset(&match, 0, sizeof(match));
 			if (trap_BotFindMatch(m.message, &match, MTCONTEXT_REPLYCHAT)) {
 				ptr = m.message + match.variables[MESSAGE].offset;
 			}
