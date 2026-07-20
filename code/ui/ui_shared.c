@@ -19,10 +19,14 @@ along with Quake III Arena source code; if not, write to the Free Software
 Foundation, Inc., 51 Franklin St, Fifth Floor, Boston, MA  02110-1301  USA
 ===========================================================================
 */
-// 
+//
 // string allocation/management
 
 #include "ui_shared.h"
+
+// VR API bootstrap mirror (defined in vr_ui.c for the TA UI module,
+// vr_cgame.c for the missionpack cgame that also compiles this TU)
+extern qboolean		vrActive;
 
 #define SCROLL_TIME_START					500
 #define SCROLL_TIME_ADJUST				150
@@ -3648,11 +3652,43 @@ qboolean Item_Bind_HandleKey(itemDef_t *item, int key, qboolean down) {
 
 
 void AdjustFrom640(float *x, float *y, float *w, float *h) {
-	//*x = *x * DC->scale + DC->bias;
-	*x *= DC->xscale;
-	*y *= DC->yscale;
-	*w *= DC->xscale;
-	*h *= DC->yscale;
+	if (!vrActive) {
+		//*x = *x * DC->scale + DC->bias;
+		*x *= DC->xscale;
+		*y *= DC->yscale;
+		*w *= DC->xscale;
+		*h *= DC->yscale;
+		return;
+	}
+
+	// Shared with ui_atoms.c UI_AdjustFrom640 via UI_VR_AdjustFrom640() so text,
+	// cursor, ownerdraws and .menu widgets (bars/backgrounds/model rects) use
+	// ONE VR transform: scale into the centered 4:3 viewable box and apply the
+	// optical-center Y offset for the headset's asymmetric FOV. Menu hit-testing
+	// is done in raw 640 space, so any draw path that used a different mapping
+	// would drift the visible target away from its clickable rect.
+	if ( UI_VR_AdjustFrom640( x, y, w, h ) ) {
+		return;
+	}
+
+	// Non-virtual-screen VR: the in-world transform, and it IS live. Missionpack
+	// paints the VR HUD (hud.menu widgets) through Menu_PaintAll during gameplay
+	// (cg_draw.c, when the VR HUD mode != 0) while vr->virtual_screen is false, so
+	// this branch scales those widgets. It intentionally differs from the
+	// virtual_screen menu transform above (which matches ui_atoms UI_AdjustFrom640);
+	// do not assume it is dead and delete it.
+	{
+		float screenXScale = DC->xscale / 2.75f;
+		float screenYScale = DC->yscale / 2.75f;
+
+		*x *= screenXScale;
+		*y *= screenYScale;
+		*w *= screenXScale;
+		*h *= screenYScale;
+
+		*x += (DC->glconfig.vidWidth - (640 * screenXScale)) / 2.0f;
+		*y += (DC->glconfig.vidHeight - (480 * screenYScale)) / 2.0f;
+	}
 }
 
 void Item_Model_Paint(itemDef_t *item) {
@@ -3696,8 +3732,15 @@ void Item_Model_Paint(itemDef_t *item) {
 	} else {
 		origin[0] = item->textscale;
 	}
-	refdef.fov_x = (modelPtr->fov_x) ? modelPtr->fov_x : w;
-	refdef.fov_y = (modelPtr->fov_y) ? modelPtr->fov_y : h;
+	{
+		// Origin above uses a fixed tan(fov/2) term, so only the projection
+		// fov needs compensating: UI_VR_CompensateModelFov pre-widens under VR
+		// so the renderer's 4:3 cropFactor rescale of NOWORLDMODEL scenes
+		// restores the intended aspect. Flatscreen keeps the desired fov unchanged.
+		float desFovX = (modelPtr->fov_x) ? modelPtr->fov_x : w;
+		float desFovY = (modelPtr->fov_y) ? modelPtr->fov_y : h;
+		UI_VR_CompensateModelFov( &refdef, desFovX, desFovY );
+	}
 
 	//refdef.fov_x = (int)((float)refdef.width / 640.0f * 90.0f);
 	//xx = refdef.width / tan( refdef.fov_x / 360 * M_PI );
