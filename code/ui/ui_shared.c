@@ -102,7 +102,7 @@ static qboolean Menu_OverActiveItem(menuDef_t *menu, float x, float y);
 #ifdef CGAME
 #define MEM_POOL_SIZE  128 * 1024
 #else
-#define MEM_POOL_SIZE  1024 * 1024
+#define MEM_POOL_SIZE  1536 * 1024	// the VR menus add about 110 KB to the stock menus' 0.9 MB
 #endif
 
 static char		memoryPool[MEM_POOL_SIZE];
@@ -3670,9 +3670,8 @@ qboolean Item_Bind_HandleKey(itemDef_t *item, int key, qboolean down) {
 
 
 void AdjustFrom640(float *x, float *y, float *w, float *h) {
-	//*x = *x * DC->scale + DC->bias;
-	*x *= DC->xscale;
-	*y *= DC->yscale;
+	*x = *x * DC->xscale + DC->bias;
+	*y = *y * DC->yscale + DC->biasY;
 	*w *= DC->xscale;
 	*h *= DC->yscale;
 }
@@ -3718,8 +3717,15 @@ void Item_Model_Paint(itemDef_t *item) {
 	} else {
 		origin[0] = item->textscale;
 	}
-	refdef.fov_x = (modelPtr->fov_x) ? modelPtr->fov_x : w;
-	refdef.fov_y = (modelPtr->fov_y) ? modelPtr->fov_y : h;
+	{
+		// Origin above uses a fixed tan(fov/2) term, so only the projection
+		// fov needs compensating: UI_VR_CompensateModelFov pre-widens under VR
+		// so the renderer's 4:3 cropFactor rescale of NOWORLDMODEL scenes
+		// restores the intended aspect. Flatscreen keeps the desired fov unchanged.
+		float desFovX = (modelPtr->fov_x) ? modelPtr->fov_x : w;
+		float desFovY = (modelPtr->fov_y) ? modelPtr->fov_y : h;
+		UI_VR_CompensateModelFov( &refdef, desFovX, desFovY );
+	}
 
 	//refdef.fov_x = (int)((float)refdef.width / 640.0f * 90.0f);
 	//xx = refdef.width / tan( refdef.fov_x / 360 * M_PI );

@@ -421,7 +421,7 @@ Adjusted for resolution and screen aspect ratio
 void UI_AdjustFrom640( float *x, float *y, float *w, float *h ) {
 	// expect valid pointers
 	*x = *x * uiInfo.uiDC.xscale + uiInfo.uiDC.bias;
-	*y *= uiInfo.uiDC.yscale;
+	*y = *y * uiInfo.uiDC.yscale + uiInfo.uiDC.biasY;
 	*w *= uiInfo.uiDC.xscale;
 	*h *= uiInfo.uiDC.yscale;
 }

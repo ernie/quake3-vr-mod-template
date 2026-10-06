@@ -50,6 +50,7 @@ Q_EXPORT intptr_t vmMain( int command, int arg0, int arg1, int arg2, int arg3, i
 		return 0;
 
 	case UI_SHUTDOWN:
+		UI_VR_Shutdown();
 		UI_Shutdown();
 		return 0;
 
