@@ -206,9 +206,33 @@ itemDef {
       	forecolor 1 1 1 1
 	backcolor 0 .17 0 1 
       	visible 1 
+	cvarTest "ui_vrActive"
+	hideCvar { "1" }
       	action { open ingame_controls }
 	mouseEnter { setitemcolor controls backcolor .1 .37 .1 1 }
       	mouseExit { setitemcolor controls backcolor 0 .17 0 1 }
+	}
+
+// VR takes the Controls tab: VR Options holds the controller bindings.
+itemDef {
+	name vrtab
+	text "VR"
+	type 1
+	style WINDOW_STYLE_FILLED
+	background "ui/assets/button_back.tga"
+	rect 290 0 58 30
+	textalign 1
+	textalignx 29
+	textaligny 22
+	textscale .25
+	forecolor 1 1 1 1
+	backcolor 0 .17 0 1
+	visible 1
+	cvarTest "ui_vrActive"
+	showCvar { "1" }
+	action { open ingame_vroptions }
+	mouseEnter { setitemcolor vrtab backcolor .1 .37 .1 1 }
+	mouseExit { setitemcolor vrtab backcolor 0 .17 0 1 }
 	}
 
 itemdef

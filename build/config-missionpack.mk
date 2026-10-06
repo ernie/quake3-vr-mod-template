@@ -1,4 +1,6 @@
 PK3 = zzz-vrtemplate-mp.pk3
+# The .menu files include ui/menudef.h, so the pak carries the one the UI builds against.
+PK3_EXTRA = ui/menudef.h
 
 basedir = ../code
 

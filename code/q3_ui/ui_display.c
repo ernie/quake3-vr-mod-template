@@ -35,6 +35,8 @@ DISPLAY OPTIONS MENU
 #define ART_FRAMER			"menu/art/frame1_r"
 #define ART_BACK0			"menu/art/back_0"
 #define ART_BACK1			"menu/art/back_1"
+#define ART_APPLY0			"menu/art/accept_0"
+#define ART_APPLY1			"menu/art/accept_1"
 
 #define ID_GRAPHICS			10
 #define ID_DISPLAY			11
@@ -43,6 +45,8 @@ DISPLAY OPTIONS MENU
 #define ID_BRIGHTNESS		14
 #define ID_SCREENSIZE		15
 #define ID_BACK				16
+#define ID_VRMODE			17
+#define ID_APPLY			18
 
 
 typedef struct {
@@ -59,11 +63,29 @@ typedef struct {
 
 	menuslider_s	brightness;
 	menuslider_s	screensize;
+	menulist_s		mode;
 
 	menubitmap_s	back;
+	menubitmap_s	apply;
 } displayOptionsInfo_t;
 
 static displayOptionsInfo_t	displayOptionsInfo;
+
+static const char *displayModes[] = { "Flatscreen", "VR", NULL };
+
+
+/*
+=================
+UI_DisplayOptionsMenu_UpdateItems
+=================
+*/
+static void UI_DisplayOptionsMenu_UpdateItems( void ) {
+	if ( UI_VR_ModePending() ) {
+		displayOptionsInfo.apply.generic.flags &= ~(QMF_HIDDEN|QMF_INACTIVE);
+	} else {
+		displayOptionsInfo.apply.generic.flags |= QMF_HIDDEN|QMF_INACTIVE;
+	}
+}
 
 
 /*
@@ -101,6 +123,15 @@ static void UI_DisplayOptionsMenu_Event( void* ptr, int event ) {
 	
 	case ID_SCREENSIZE:
 		trap_Cvar_SetValue( "cg_viewsize", displayOptionsInfo.screensize.curvalue * 10 );
+		break;
+
+	case ID_VRMODE:
+		UI_VR_ChooseMode( displayOptionsInfo.mode.curvalue != 0 );
+		UI_DisplayOptionsMenu_UpdateItems();
+		break;
+
+	case ID_APPLY:
+		trap_Cmd_ExecuteText( EXEC_APPEND, "vid_restart\n" );
 		break;
 
 	case ID_BACK:
@@ -189,6 +220,17 @@ static void UI_DisplayOptionsMenu_Init( void ) {
 	displayOptionsInfo.network.color				= color_red;
 
 	y = 240 - 1 * (BIGCHAR_HEIGHT+2);
+	if ( UI_VR_CanSwitchMode() ) {
+		displayOptionsInfo.mode.generic.type		= MTYPE_SPINCONTROL;
+		displayOptionsInfo.mode.generic.name		= "Display Mode:";
+		displayOptionsInfo.mode.generic.flags		= QMF_PULSEIFFOCUS|QMF_SMALLFONT;
+		displayOptionsInfo.mode.generic.callback	= UI_DisplayOptionsMenu_Event;
+		displayOptionsInfo.mode.generic.id			= ID_VRMODE;
+		displayOptionsInfo.mode.generic.x			= 400;
+		displayOptionsInfo.mode.generic.y			= y - (BIGCHAR_HEIGHT+2);
+		displayOptionsInfo.mode.itemnames			= displayModes;
+	}
+
 	displayOptionsInfo.brightness.generic.type		= MTYPE_SLIDER;
 	displayOptionsInfo.brightness.generic.name		= "Brightness:";
 	displayOptionsInfo.brightness.generic.flags		= QMF_PULSEIFFOCUS|QMF_SMALLFONT;
@@ -224,6 +266,17 @@ static void UI_DisplayOptionsMenu_Init( void ) {
 	displayOptionsInfo.back.height				= 64;
 	displayOptionsInfo.back.focuspic			= ART_BACK1;
 
+	displayOptionsInfo.apply.generic.type		= MTYPE_BITMAP;
+	displayOptionsInfo.apply.generic.name		= ART_APPLY0;
+	displayOptionsInfo.apply.generic.flags		= QMF_RIGHT_JUSTIFY|QMF_PULSEIFFOCUS|QMF_HIDDEN|QMF_INACTIVE;
+	displayOptionsInfo.apply.generic.callback	= UI_DisplayOptionsMenu_Event;
+	displayOptionsInfo.apply.generic.id			= ID_APPLY;
+	displayOptionsInfo.apply.generic.x			= 640;
+	displayOptionsInfo.apply.generic.y			= 480-64;
+	displayOptionsInfo.apply.width				= 128;
+	displayOptionsInfo.apply.height				= 64;
+	displayOptionsInfo.apply.focuspic			= ART_APPLY1;
+
 	Menu_AddItem( &displayOptionsInfo.menu, ( void * ) &displayOptionsInfo.banner );
 	Menu_AddItem( &displayOptionsInfo.menu, ( void * ) &displayOptionsInfo.framel );
 	Menu_AddItem( &displayOptionsInfo.menu, ( void * ) &displayOptionsInfo.framer );
@@ -231,12 +284,18 @@ static void UI_DisplayOptionsMenu_Init( void ) {
 	Menu_AddItem( &displayOptionsInfo.menu, ( void * ) &displayOptionsInfo.display );
 	Menu_AddItem( &displayOptionsInfo.menu, ( void * ) &displayOptionsInfo.sound );
 	Menu_AddItem( &displayOptionsInfo.menu, ( void * ) &displayOptionsInfo.network );
+	if ( UI_VR_CanSwitchMode() ) {
+		Menu_AddItem( &displayOptionsInfo.menu, ( void * ) &displayOptionsInfo.mode );
+	}
 	Menu_AddItem( &displayOptionsInfo.menu, ( void * ) &displayOptionsInfo.brightness );
 	Menu_AddItem( &displayOptionsInfo.menu, ( void * ) &displayOptionsInfo.screensize );
 	Menu_AddItem( &displayOptionsInfo.menu, ( void * ) &displayOptionsInfo.back );
+	Menu_AddItem( &displayOptionsInfo.menu, ( void * ) &displayOptionsInfo.apply );
 
 	displayOptionsInfo.brightness.curvalue  = trap_Cvar_VariableValue("r_gamma") * 10;
 	displayOptionsInfo.screensize.curvalue  = trap_Cvar_VariableValue( "cg_viewsize")/10;
+	displayOptionsInfo.mode.curvalue = UI_VR_ModeChoice();
+	UI_DisplayOptionsMenu_UpdateItems();
 }
 
 
@@ -250,6 +309,8 @@ void UI_DisplayOptionsMenu_Cache( void ) {
 	trap_R_RegisterShaderNoMip( ART_FRAMER );
 	trap_R_RegisterShaderNoMip( ART_BACK0 );
 	trap_R_RegisterShaderNoMip( ART_BACK1 );
+	trap_R_RegisterShaderNoMip( ART_APPLY0 );
+	trap_R_RegisterShaderNoMip( ART_APPLY1 );
 }
 
 

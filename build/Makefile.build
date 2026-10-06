@@ -26,7 +26,7 @@ dirs:
 # Asset edits at any depth must retrigger the pack, but make has no recursive
 # wildcard and prerequisite lists cannot hold spaced filenames - so probe
 # mtimes with find and force the pack when any asset is newer than the pk3.
-ifneq ($(shell find ../assets-$(CONFIG) -type f -newer $(DISTDIR)/$(PK3) -print -quit 2>/dev/null),)
+ifneq ($(shell find ../assets-$(CONFIG) $(addprefix ../,$(PK3_EXTRA)) -type f -newer $(DISTDIR)/$(PK3) -print -quit 2>/dev/null),)
 ASSETS_FORCE = FORCE
 endif
 
@@ -37,6 +37,7 @@ $(DISTDIR)/$(PK3): $(STAGING)/vm/qagame.qvm $(STAGING)/vm/cgame.qvm $(STAGING)/v
 	rm -f $(DISTDIR)/$(PK3)
 	cd $(STAGING) && $(7Z) ../$(DISTDIR)/$(PK3) vm/*.qvm
 	if [ -n "$$(ls -A ../assets-$(CONFIG) 2>/dev/null)" ]; then cd ../assets-$(CONFIG) && $(7Z) ../build/$(DISTDIR)/$(PK3) *; fi
+	$(if $(PK3_EXTRA),cd .. && $(7Z) build/$(DISTDIR)/$(PK3) $(PK3_EXTRA))
 
 $(STAGING)/vm/%.qvm: $(BD)/%.qvm | $(STAGING)/vm
 	cp $< $@
