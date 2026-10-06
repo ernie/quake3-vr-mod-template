@@ -60,6 +60,8 @@ itemDef {
 	backcolor 0 0 0 0
 	forecolor 1 1 1 1
 	visible 1 
+	cvarTest "ui_vrActive"
+	hideCvar { "1" }
 	action { play "sound/misc/kcaction.wav" ; 
 	close control_menu ; 
 	close system_menu ;
@@ -70,6 +72,33 @@ itemDef {
 	open control_menu }
 	mouseenter { show message_controls }
 	mouseexit { hide message_controls }
+	}
+
+// VR takes the Controls slot: VR Options holds the controller bindings.
+itemDef {
+	name vroptions
+	text "VR Options"
+	textscale .5
+	style 0
+	type 1
+	textstyle 6
+	rect 0 75 200 40
+	textalign 3
+	textalignx 20
+	textaligny 32
+	backcolor 0 0 0 0
+	forecolor 1 1 1 1
+	visible 1
+	cvarTest "ui_vrActive"
+	showCvar { "1" }
+	action { play "sound/misc/kcaction.wav" ;
+	close control_menu ;
+	close system_menu ;
+	close options_menu ;
+	close cdkey_menu ;
+	close default_menu ;
+	close resetscore_menu ;
+	open vroptions_menu }
 	}
 	
 
