@@ -48,6 +48,7 @@ SETUP MENU
 #define ID_SAVE					16
 #define ID_DEFAULTS				17
 #define ID_BACK					18
+#define ID_VR					19
 
 
 typedef struct {
@@ -58,6 +59,7 @@ typedef struct {
 	menubitmap_s	framer;
 	menutext_s		setupplayer;
 	menutext_s		setupcontrols;
+	menutext_s		vr;
 	menutext_s		setupsystem;
 	menutext_s		game;
 	menutext_s		cdkey;
@@ -115,6 +117,10 @@ static void UI_SetupMenu_Event( void *ptr, int event ) {
 		UI_ControlsMenu();
 		break;
 
+	case ID_VR:
+		UI_VROptionsMenu();
+		break;
+
 	case ID_SYSTEMCONFIG:
 		UI_GraphicsOptionsMenu();
 		break;
@@ -153,8 +159,11 @@ UI_SetupMenu_Init
 */
 static void UI_SetupMenu_Init( void ) {
 	int				y;
+	qboolean		vrEnabled;
 
 	UI_SetupMenu_Cache();
+
+	vrEnabled = ( UI_VR_Platform() != VRP_NONE );
 
 	memset( &setupMenuInfo, 0, sizeof(setupMenuInfo) );
 	setupMenuInfo.menu.wrapAround = qtrue;
@@ -194,16 +203,32 @@ static void UI_SetupMenu_Init( void ) {
 	setupMenuInfo.setupplayer.color					= color_red;
 	setupMenuInfo.setupplayer.style					= UI_CENTER;
 
-	y += SETUP_MENU_VERTICAL_SPACING;
-	setupMenuInfo.setupcontrols.generic.type		= MTYPE_PTEXT;
-	setupMenuInfo.setupcontrols.generic.flags		= QMF_CENTER_JUSTIFY|QMF_PULSEIFFOCUS;
-	setupMenuInfo.setupcontrols.generic.x			= 320;
-	setupMenuInfo.setupcontrols.generic.y			= y;
-	setupMenuInfo.setupcontrols.generic.id			= ID_CUSTOMIZECONTROLS;
-	setupMenuInfo.setupcontrols.generic.callback	= UI_SetupMenu_Event; 
-	setupMenuInfo.setupcontrols.string				= "CONTROLS";
-	setupMenuInfo.setupcontrols.color				= color_red;
-	setupMenuInfo.setupcontrols.style				= UI_CENTER;
+	// keyboard binds page is flatscreen-only; VR binds live in VR OPTIONS
+	if ( !vrEnabled ) {
+		y += SETUP_MENU_VERTICAL_SPACING;
+		setupMenuInfo.setupcontrols.generic.type		= MTYPE_PTEXT;
+		setupMenuInfo.setupcontrols.generic.flags		= QMF_CENTER_JUSTIFY|QMF_PULSEIFFOCUS;
+		setupMenuInfo.setupcontrols.generic.x			= 320;
+		setupMenuInfo.setupcontrols.generic.y			= y;
+		setupMenuInfo.setupcontrols.generic.id			= ID_CUSTOMIZECONTROLS;
+		setupMenuInfo.setupcontrols.generic.callback	= UI_SetupMenu_Event;
+		setupMenuInfo.setupcontrols.string				= "CONTROLS";
+		setupMenuInfo.setupcontrols.color				= color_red;
+		setupMenuInfo.setupcontrols.style				= UI_CENTER;
+	}
+
+	if ( vrEnabled ) {
+		y += SETUP_MENU_VERTICAL_SPACING;
+		setupMenuInfo.vr.generic.type				= MTYPE_PTEXT;
+		setupMenuInfo.vr.generic.flags				= QMF_CENTER_JUSTIFY|QMF_PULSEIFFOCUS;
+		setupMenuInfo.vr.generic.x					= 320;
+		setupMenuInfo.vr.generic.y					= y;
+		setupMenuInfo.vr.generic.id					= ID_VR;
+		setupMenuInfo.vr.generic.callback			= UI_SetupMenu_Event;
+		setupMenuInfo.vr.string						= "VR OPTIONS";
+		setupMenuInfo.vr.color						= color_red;
+		setupMenuInfo.vr.style						= UI_CENTER;
+	}
 
 	y += SETUP_MENU_VERTICAL_SPACING;
 	setupMenuInfo.setupsystem.generic.type			= MTYPE_PTEXT;
@@ -290,7 +315,12 @@ static void UI_SetupMenu_Init( void ) {
 	Menu_AddItem( &setupMenuInfo.menu, &setupMenuInfo.framel );
 	Menu_AddItem( &setupMenuInfo.menu, &setupMenuInfo.framer );
 	Menu_AddItem( &setupMenuInfo.menu, &setupMenuInfo.setupplayer );
-	Menu_AddItem( &setupMenuInfo.menu, &setupMenuInfo.setupcontrols );
+	if ( !vrEnabled ) {
+		Menu_AddItem( &setupMenuInfo.menu, &setupMenuInfo.setupcontrols );
+	}
+	if ( vrEnabled ) {
+		Menu_AddItem( &setupMenuInfo.menu, &setupMenuInfo.vr );
+	}
 	Menu_AddItem( &setupMenuInfo.menu, &setupMenuInfo.setupsystem );
 	Menu_AddItem( &setupMenuInfo.menu, &setupMenuInfo.game );
 	Menu_AddItem( &setupMenuInfo.menu, &setupMenuInfo.cdkey );

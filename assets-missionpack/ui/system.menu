@@ -11,7 +11,7 @@ menuDef {
     	focusColor 1 .75 0 1
     	style 1
     	border 1
-	onOpen { setitemcolor fadebox backcolor 0 0 0 1 ; fadeout fadebox ; hide grpSystem ; show graphics }
+	onOpen { uiScript vrModeSetup ; setitemcolor fadebox backcolor 0 0 0 1 ; fadeout fadebox ; hide grpSystem ; show graphics }
 	onEsc { close system_menu ; close setup_menu ; open main }
 
 
@@ -544,6 +544,26 @@ itemDef {
       		forecolor 1 1 1 1
       		visible 0 
     		}
+
+	// vr_enabled is latched: the row edits ui_vrEnabled and the drop's menu scripts carry the choice
+	itemDef {
+		name other
+		group grpSystem
+		type ITEM_TYPE_MULTI
+		text "Display Mode:"
+		cvar "ui_vrEnabled"
+		cvarFloatList { "Flatscreen" 0 "VR" 1 }
+		rect 99 106 256 20
+		textalign ITEM_ALIGN_RIGHT
+		textalignx 128
+		textaligny 20
+		textscale .333
+		forecolor 1 1 1 1
+		visible 0
+		cvarTest "ui_vrModeSwitchAvailable"
+		showCvar { "1" }
+		action { uiScript vrModeChanged }
+	}
 
 itemDef {
       	name other			
