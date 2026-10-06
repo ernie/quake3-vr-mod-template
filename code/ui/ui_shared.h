@@ -370,6 +370,7 @@ typedef struct {
   float			yscale;
   float			xscale;
   float			bias;
+  float			biasY;
   int				realTime;
   int				frameTime;
 	float			cursorx;

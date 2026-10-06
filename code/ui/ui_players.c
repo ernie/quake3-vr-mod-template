@@ -726,6 +726,8 @@ void UI_DrawPlayer( float x, float y, float w, float h, playerInfo_t *pi, int ti
 	vec3_t			maxs = {16, 16, 32};
 	float			len;
 	float			xx;
+	float			desiredFovX;
+	float			desiredFovY;
 
 	if ( !pi->legsModel || !pi->torsoModel || !pi->headModel || !pi->animations[0].numFrames ) {
 		return;
@@ -748,6 +750,12 @@ void UI_DrawPlayer( float x, float y, float w, float h, playerInfo_t *pi, int ti
 		}
 	}
 
+	// calculate fov from virtual dimensions
+	// so it will be resolution-independent
+	desiredFovX = (int)(w / 640.0f * 90.0f);
+	xx = w / tan( desiredFovX / 360 * M_PI );
+	desiredFovY = atan2( h, xx ) * ( 360 / (float)M_PI );
+
 	UI_AdjustFrom640( &x, &y, &w, &h );
 
 	y -= jumpHeight;
@@ -766,14 +774,14 @@ void UI_DrawPlayer( float x, float y, float w, float h, playerInfo_t *pi, int ti
 	refdef.width = w;
 	refdef.height = h;
 
-	refdef.fov_x = (int)((float)refdef.width / uiInfo.uiDC.xscale / 640.0f * 90.0f);
-	xx = refdef.width / uiInfo.uiDC.xscale / tan( refdef.fov_x / 360 * M_PI );
-	refdef.fov_y = atan2( refdef.height / uiInfo.uiDC.yscale, xx );
-	refdef.fov_y *= ( 360 / (float)M_PI );
+	// Pre-widen fov so the renderer's 4:3 cropFactor rescale of
+	// NOWORLDMODEL scenes restores the intended aspect (see q3_ui
+	// UI_DrawPlayer). Origin math below stays on the DESIRED fov.
+	UI_VR_CompensateModelFov( &refdef, desiredFovX, desiredFovY );
 
 	// calculate distance so the player nearly fills the box
 	len = 0.7 * ( maxs[2] - mins[2] );
-	origin[0] = len / tan( DEG2RAD(refdef.fov_x) * 0.5 );
+	origin[0] = len / tan( DEG2RAD(desiredFovX) * 0.5 );
 	origin[1] = 0.5 * ( mins[1] + maxs[1] );
 	origin[2] = -0.5 * ( mins[2] + maxs[2] );
 
