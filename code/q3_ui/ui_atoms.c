@@ -859,6 +859,10 @@ void UI_KeyEvent( int key, int down ) {
 		return;
 	}
 
+	if ( UI_VR_KeyEvent( key, down ) ) {
+		return;
+	}
+
 	if (uis.activemenu->key)
 		s = uis.activemenu->key( key );
 	else
@@ -879,6 +883,10 @@ void UI_MouseEvent( int dx, int dy )
 	int				bias;
 	menucommon_s*	m;
 
+	if ( UI_VR_StickNavActive() ) {
+		return;   // thumbstick nav owns selection; ignore ray hover
+	}
+
 	if (!uis.activemenu)
 		return;
 
@@ -897,6 +905,14 @@ void UI_MouseEvent( int dx, int dy )
 		uis.cursory = 0;
 	else if (uis.cursory > SCREEN_HEIGHT)
 		uis.cursory = SCREEN_HEIGHT;
+
+	// the VR pointer can rest past the screen's edges, so it lands after the clamp
+	UI_VR_CursorOverride( &uis.cursorx, &uis.cursory );
+
+	// Don't change menu cursor while keyboard is active - keep focus on the field
+	if (UI_VKeyboardIsActive()) {
+		return;
+	}
 
 	// region test the active menu items
 	for (i=0; i<uis.activemenu->nitems; i++)
@@ -923,6 +939,7 @@ void UI_MouseEvent( int dx, int dy )
 
 			if ( !(((menucommon_s*)(uis.activemenu->items[uis.activemenu->cursor]))->flags & QMF_SILENT ) ) {
 				trap_S_StartLocalSound( menu_move_sound, CHAN_LOCAL_SOUND );
+				UI_VR_OnMenuMove();
 			}
 		}
 
@@ -1068,6 +1085,8 @@ UI_Init
 =================
 */
 void UI_Init( void ) {
+	UI_VR_Init();
+
 	UI_RegisterCvars();
 
 	UI_InitGameinfo();
@@ -1199,6 +1218,10 @@ UI_Refresh
 */
 void UI_Refresh( int realtime )
 {
+	UI_VR_UpdateScale();
+
+	UI_VR_CursorOverride( &uis.cursorx, &uis.cursory );
+
 	uis.frametime = realtime - uis.realtime;
 	uis.realtime  = realtime;
 
@@ -1232,9 +1255,11 @@ void UI_Refresh( int realtime )
 		}
 	}
 
-	// draw cursor
-	UI_SetColor( NULL );
-	UI_DrawHandlePic( uis.cursorx-16, uis.cursory-16, 32, 32, uis.cursor);
+	// draw cursor (hidden when virtual keyboard has its own cursors, or when thumbstick nav owns selection)
+	if ( !UI_VR_HideCursor() ) {
+		UI_SetColor( NULL );
+		UI_DrawHandlePic( uis.cursorx-16, uis.cursory-16, 32, 32, uis.cursor);
+	}
 
 #ifndef NDEBUG
 	if (uis.debug)

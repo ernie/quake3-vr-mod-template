@@ -164,6 +164,7 @@ Q_EXPORT intptr_t vmMain( int command, int arg0, int arg1, int arg2, int arg3, i
 		  return 0;
 
 	  case UI_SHUTDOWN:
+		  UI_VR_Shutdown();
 		  _UI_Shutdown();
 		  return 0;
 
@@ -597,6 +598,8 @@ void _UI_Refresh( int realtime )
 	//	return;
 	//}
 
+	UI_VR_CursorOverride( &uiInfo.uiDC.cursorx, &uiInfo.uiDC.cursory );
+
 	uiInfo.uiDC.frameTime = realtime - uiInfo.uiDC.realTime;
 	uiInfo.uiDC.realTime = realtime;
 
@@ -630,9 +633,10 @@ void _UI_Refresh( int realtime )
 		UI_BuildFindPlayerList(qfalse);
 	} 
 	
-	// draw cursor
+	// draw cursor (hidden while the virtual keyboard draws its own cursors,
+	// or while thumbstick nav owns selection)
 	UI_SetColor( NULL );
-	if (Menu_Count() > 0 && (trap_Key_GetCatcher() & KEYCATCH_UI)) {
+	if (Menu_Count() > 0 && (trap_Key_GetCatcher() & KEYCATCH_UI) && !UI_VR_HideCursor()) {
 		UI_DrawHandlePic( uiInfo.uiDC.cursorx-16, uiInfo.uiDC.cursory-16, 32, 32, uiInfo.uiDC.Assets.cursor);
 	}
 
@@ -990,6 +994,7 @@ void UI_Load(void) {
 #endif
 
 	UI_LoadMenus(menuSet, qtrue);
+	UI_VR_LoadMenus();
 	Menus_CloseAll();
 	Menus_ActivateByName(lastName);
 
@@ -1739,7 +1744,7 @@ static int UI_OwnerDrawWidth(int ownerDraw, float scale) {
 			s = UI_Cvar_VariableString(va("ui_lastServerRefresh_%i", ui_netSource.integer));
 			break;
     default:
-      break;
+      return UI_VR_OwnerDrawWidth(ownerDraw, scale);
   }
 
 	if (s) {
@@ -2136,6 +2141,7 @@ static void UI_OwnerDraw(float x, float y, float w, float h, float text_x, float
 			UI_DrawKeyBindStatus(&rect,scale, color, textStyle);
 			break;
     default:
+      UI_VR_OwnerDraw(x, y, w, h, text_x, text_y, ownerDraw, ownerDrawFlags, align, special, scale, color, shader, textStyle);
       break;
   }
 
@@ -2700,7 +2706,7 @@ static qboolean UI_OwnerDrawHandleKey(int ownerDraw, int flags, float *special, 
 			UI_SelectedPlayer_HandleKey(flags, special, key);
 			break;
     default:
-      break;
+      return UI_VR_OwnerDrawHandleKey(ownerDraw, flags, special, key);
   }
 
   return qfalse;
@@ -3534,6 +3540,8 @@ static void UI_RunMenuScript(char **args) {
 			int stat;
 			if ( Int_Parse( args, &stat ) )
 				trap_SetPbClStatus( stat );
+		} else if ( UI_VR_RunMenuScript( command ) ) {
+			// handled
 		}
 		else {
 			Com_Printf("unknown UI script %s\n", command);
@@ -5071,6 +5079,8 @@ void _UI_Init( qboolean inGameLoad ) {
 
 	//uiInfo.inGameLoad = inGameLoad;
 
+	UI_VR_Init();
+
 	UI_RegisterCvars();
 	UI_InitMemory();
 
@@ -5143,6 +5153,7 @@ void _UI_Init( qboolean inGameLoad ) {
 	uiInfo.uiDC.stopCinematic = &UI_StopCinematic;
 	uiInfo.uiDC.drawCinematic = &UI_DrawCinematic;
 	uiInfo.uiDC.runCinematicFrame = &UI_RunCinematicFrame;
+	uiInfo.uiDC.vrEditField = &UI_VR_OnEditField;
 
 	Init_Display(&uiInfo.uiDC);
 
@@ -5181,7 +5192,8 @@ void _UI_Init( qboolean inGameLoad ) {
 	UI_LoadMenus(menuSet, qtrue);
 	UI_LoadMenus("ui/ingame.txt", qfalse);
 #endif
-	
+	UI_VR_LoadMenus();
+
 	Menus_CloseAll();
 
 	trap_LAN_LoadCachedServers();
@@ -5220,6 +5232,10 @@ UI_KeyEvent
 */
 void _UI_KeyEvent( int key, qboolean down ) {
 
+  if ( UI_VR_KeyEvent( key, down ) ) {
+    return;
+  }
+
   if (Menu_Count() > 0) {
     menuDef_t *menu = Menu_GetFocused();
 		if (menu) {
@@ -5248,6 +5264,12 @@ UI_MouseEvent
 void _UI_MouseEvent( int dx, int dy )
 {
 	int bias;
+
+	if ( UI_VR_StickNavActive() ) {
+		return;   // thumbstick nav owns selection; ignore ray hover
+	}
+
+	UI_VR_CursorOverride( &uiInfo.uiDC.cursorx, &uiInfo.uiDC.cursory );
 
 	// convert X bias to 640 coords
 	bias = uiInfo.uiDC.bias / uiInfo.uiDC.xscale;
@@ -5543,6 +5565,14 @@ void UI_DrawConnectScreen( qboolean overlay ) {
 
 
 	if ( !overlay && menu ) {
+		// VR: cover the physical framebuffer edge-to-edge before the stock
+		// paint, so the letterbox bars outside the centered 4:3 box (see
+		// UI_VR_AdjustFrom640) don't show stale eye-buffer content. Gated
+		// to VR only: on flatscreen an ungated fill would visibly paint the
+		// window's black bars with the menu background.
+		if ( vrActive && menu->window.background ) {
+			UI_VR_FillScreen( menu->window.background );
+		}
 		Menu_Paint(menu, qtrue);
 	}
 
