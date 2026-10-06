@@ -1381,6 +1381,10 @@ void Menu_CursorMoved( menuframework_s *m )
 	
 	if (m->cursor >= 0 && m->cursor < m->nitems)
 	{
+		// a field takes typing where its text ends, as the VR keyboard expects
+		if ( ((menucommon_s*)(m->items[m->cursor]))->type == MTYPE_FIELD )
+			MField_KeyDownEvent( &((menufield_s*)(m->items[m->cursor]))->field, K_END );
+
 		callback = ((menucommon_s*)(m->items[m->cursor]))->callback;
 		if (callback)
 			callback(m->items[m->cursor],QM_GOTFOCUS);

@@ -183,8 +183,7 @@ static void Main_MenuDraw( void ) {
 	refdef.height = h;
 
 	adjust = 0; // JDC: Kenneth asked me to stop this 1.0 * sin( (float)uis.realtime / 1000 );
-	refdef.fov_x = 60 + adjust;
-	refdef.fov_y = 19.6875 + adjust;
+	UI_VR_CompensateModelFov( &refdef, 60 + adjust, 19.6875 + adjust );
 
 	refdef.time = uis.realtime;
 

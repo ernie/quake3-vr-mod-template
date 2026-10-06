@@ -771,6 +771,10 @@ void UI_DrawPlayer( float x, float y, float w, float h, playerInfo_t *pi, int ti
 	origin[1] = 0.5 * ( mins[1] + maxs[1] );
 	origin[2] = -0.5 * ( mins[2] + maxs[2] );
 
+	// pre-widened under VR so the renderer's 4:3 crop rescale restores the
+	// intended aspect; the origin above stays on the desired fov
+	UI_VR_CompensateModelFov( &refdef, refdef.fov_x, refdef.fov_y );
+
 	refdef.time = dp_realtime;
 
 	trap_R_ClearScene();
